@@ -3,7 +3,7 @@ dist
 .git
 .gitignore
 .claude
-*.md
 *.log
 .env
 .env.*
+*.local
