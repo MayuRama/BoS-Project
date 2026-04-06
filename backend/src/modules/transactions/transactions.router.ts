@@ -1,13 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../../config/database';
-import { verifyJWT } from '../../middleware/auth';
+import { verifyJWT, optionalJWT } from '../../middleware/auth';
 import { getPageParams, paginate, generateRefNumber, generateAlertCode } from '../../utils/helpers';
 import { runAMLChecks } from '../../utils/amlRules';
 import { emitTransactionNew, emitAMLAlert } from '../../socket/socket';
 
 const router = Router();
-router.use(verifyJWT);
 
 const txSchema = z.object({
   type: z.enum(['BuyUSD', 'SellUSD']),
@@ -22,17 +21,18 @@ const txSchema = z.object({
 });
 
 // GET /api/transactions
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, limit, skip } = getPageParams(req.query);
     const { type, status, telco, dealerId, search } = req.query;
 
     const where: Record<string, unknown> = {};
 
-    // Dealers only see their own transactions
-    if (req.user!.dealerId) {
-      where.dealerId = req.user!.dealerId;
+    // If authenticated dealer — only their transactions
+    if (req.user?.dealerId) {
+      where.dealerId = req.user.dealerId;
     } else if (dealerId) {
+      // Allow filtering by dealerId via query param (for prototype)
       where.dealerId = dealerId;
     }
 
@@ -61,10 +61,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // GET /api/transactions/stats/summary
-router.get('/stats/summary', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/stats/summary', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const where: Record<string, unknown> = {};
-    if (req.user!.dealerId) where.dealerId = req.user!.dealerId;
+    if (req.user?.dealerId) where.dealerId = req.user.dealerId;
 
     const [total, byTelco, byType, byStatus] = await Promise.all([
       prisma.transaction.aggregate({ where, _sum: { amountUSD: true }, _count: { id: true } }),
@@ -78,7 +78,7 @@ router.get('/stats/summary', async (req: Request, res: Response, next: NextFunct
 });
 
 // GET /api/transactions/:id
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const tx = await prisma.transaction.findUnique({
       where: { id: req.params.id },
@@ -88,7 +88,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       },
     });
     if (!tx) { res.status(404).json({ error: 'Transaction not found' }); return; }
-    if (req.user!.dealerId && tx.dealerId !== req.user!.dealerId) {
+    if (req.user?.dealerId && tx.dealerId !== req.user.dealerId) {
       res.status(403).json({ error: 'Access denied' }); return;
     }
     res.json(tx);
@@ -96,7 +96,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /api/transactions
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', verifyJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = txSchema.parse(req.body);
     const amountSL = data.amountUSD * data.rate;
@@ -167,7 +167,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // PATCH /api/transactions/:id/status (CB only)
-router.patch('/:id/status', async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/:id/status', verifyJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { status } = z.object({
       status: z.enum(['Completed', 'Pending', 'Failed', 'Cancelled']),

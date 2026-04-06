@@ -52,3 +52,17 @@ export const requireDealer = requireRole('DealerAdmin', 'DealerOperator');
 export const requireCBOrDealer = (req: Request, res: Response, next: NextFunction): void => {
   verifyJWT(req, res, next);
 };
+
+// Optional auth — attaches user if token present, but never blocks the request
+export const optionalJWT = (req: Request, _res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      req.user = jwt.verify(token, process.env.JWT_ACCESS_SECRET!) as JWTPayload;
+    } catch {
+      // invalid token — just continue without user
+    }
+  }
+  next();
+};

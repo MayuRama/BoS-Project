@@ -50,7 +50,7 @@ const DealerTransactions: React.FC = () => {
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ data: unknown[] }>('/transactions?limit=200&dealerId=D002');
+      const res = await api.get<{ data: unknown[] }>('/transactions?limit=200');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setAllTx(res.data.map((t: any) => ({
         ...t,
