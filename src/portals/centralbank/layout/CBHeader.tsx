@@ -11,8 +11,8 @@ const CBHeader: React.FC<CBHeaderProps> = ({ role }) => {
     localStorage.removeItem('cb_role');
     localStorage.removeItem('cb_username');
     localStorage.removeItem('cb_fullName');
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('cb_accessToken');
+    localStorage.removeItem('cb_refreshToken');
     window.location.replace('/centralbank-portal/login');
   };
 

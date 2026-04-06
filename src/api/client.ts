@@ -1,6 +1,13 @@
 const BASE_URL = 'http://localhost:3001/api';
 
-const getToken = (): string | null => localStorage.getItem('accessToken');
+// Use separate token keys per portal so a dealer JWT never leaks into CB requests
+const getTokenKey = (): string => {
+  if (window.location.pathname.startsWith('/centralbank-portal')) return 'cb_accessToken';
+  if (window.location.pathname.startsWith('/dealer-portal')) return 'dealer_accessToken';
+  return 'accessToken';
+};
+
+const getToken = (): string | null => localStorage.getItem(getTokenKey());
 
 const authHeaders = (json = true): Record<string, string> => {
   const headers: Record<string, string> = {};

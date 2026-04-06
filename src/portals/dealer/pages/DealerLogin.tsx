@@ -34,18 +34,18 @@ const DealerLogin: React.FC = () => {
       clearTimeout(timeout);
       if (res.ok) {
         const data = await res.json();
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
+        localStorage.setItem('dealer_accessToken', data.accessToken);
+        localStorage.setItem('dealer_refreshToken', data.refreshToken);
         localStorage.setItem('dealer_username', data.user.username);
         localStorage.setItem('dealer_fullName', data.user.fullName || '');
         localStorage.setItem('dealer_id', data.user.dealerId || dealerId);
       } else {
-        localStorage.removeItem('accessToken');
+        localStorage.removeItem('dealer_accessToken');
         localStorage.setItem('dealer_id', dealerId);
       }
     } catch {
       // Backend unavailable or timed out — continue with mock login
-      localStorage.removeItem('accessToken');
+      localStorage.removeItem('dealer_accessToken');
       localStorage.setItem('dealer_id', dealerId);
     }
 

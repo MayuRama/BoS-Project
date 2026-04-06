@@ -36,16 +36,16 @@ const CBLogin: React.FC = () => {
       clearTimeout(timeout);
       if (res.ok) {
         const data = await res.json();
-        localStorage.setItem('accessToken', data.accessToken);
-        localStorage.setItem('refreshToken', data.refreshToken);
+        localStorage.setItem('cb_accessToken', data.accessToken);
+        localStorage.setItem('cb_refreshToken', data.refreshToken);
         localStorage.setItem('cb_username', data.user.username);
         localStorage.setItem('cb_fullName', data.user.fullName || '');
       } else {
-        localStorage.removeItem('accessToken');
+        localStorage.removeItem('cb_accessToken');
       }
     } catch {
       // Backend unavailable or timed out — continue with mock login
-      localStorage.removeItem('accessToken');
+      localStorage.removeItem('cb_accessToken');
     }
 
     // Always proceed (prototype behaviour — any credentials work)
