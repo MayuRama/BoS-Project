@@ -1,56 +1,27 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Building2, Lock, User, ChevronDown, Shield } from 'lucide-react';
 
-const CB_API = 'http://localhost:3001/api';
-
 const CBLogin: React.FC = () => {
-  const navigate = useNavigate();
-  const [role, setRole] = useState('FX Intervention Desk');
+  const [role, setRole]         = useState('FX Intervention Desk');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
 
   const roles = ['FX Intervention Desk', 'Supervisor', 'Auditor'];
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
-      setError('Please enter username and password.');
-      return;
-    }
+    if (!username || !password) { setError('Please enter username and password.'); return; }
     setError('');
     setLoading(true);
 
-    // Try real backend auth (best-effort — prototype always proceeds regardless)
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      const res = await fetch(`${CB_API}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('cb_accessToken', data.accessToken);
-        localStorage.setItem('cb_refreshToken', data.refreshToken);
-        localStorage.setItem('cb_username', data.user.username);
-        localStorage.setItem('cb_fullName', data.user.fullName || '');
-      } else {
-        localStorage.removeItem('cb_accessToken');
-      }
-    } catch {
-      // Backend unavailable or timed out — continue with mock login
-      localStorage.removeItem('cb_accessToken');
-    }
-
-    // Always proceed (prototype behaviour — any credentials work)
+    // UI auth — any credentials grant portal access (prototype)
+    // API auth is handled automatically by the API client using a service account
     localStorage.setItem('cb_logged_in', 'true');
     localStorage.setItem('cb_role', role);
+    localStorage.setItem('cb_username', username);
+
     window.location.replace('/centralbank-portal/dashboard');
   };
 
@@ -114,16 +85,15 @@ const CBLogin: React.FC = () => {
 
             <button type="submit" disabled={loading}
               className="w-full bg-bos-green hover:bg-bos-green/90 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors flex items-center justify-center gap-2">
-              {loading ? (
-                <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Authenticating...</>
-              ) : 'Sign In to Portal'}
+              {loading
+                ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in...</>
+                : 'Sign In to Portal'}
             </button>
           </form>
 
           <div className="mt-5 p-3 bg-white/5 border border-white/10 rounded-lg text-xs text-white/40">
             <p className="font-medium text-white/60 mb-1">Demo Access</p>
-            <p>Enter any username and password to log in.</p>
-            <p className="mt-1">For full API access use: <span className="text-white/60">fxdesk / admin123</span></p>
+            <p>Enter any username and password to access the portal.</p>
           </div>
 
           <p className="text-white/30 text-xs text-center mt-6">Restricted access — authorized personnel only</p>

@@ -6,9 +6,7 @@ const DealerHeader: React.FC = () => {
     localStorage.removeItem('dealer_logged_in');
     localStorage.removeItem('dealer_id');
     localStorage.removeItem('dealer_username');
-    localStorage.removeItem('dealer_fullName');
-    localStorage.removeItem('dealer_accessToken');
-    localStorage.removeItem('dealer_refreshToken');
+    localStorage.removeItem('dealer_api_token');
     window.location.replace('/dealer-portal/login');
   };
 
