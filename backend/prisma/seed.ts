@@ -187,7 +187,6 @@ async function main() {
           bidAmount: b.bidAmount,
           status: b.status as 'Submitted' | 'Allocated' | 'Partial' | 'Rejected',
           allocatedAmount: b.allocatedAmount,
-          wallet: b.wallet as 'Zaad' | 'eDahab' | 'Both',
         },
         update: {},
       });

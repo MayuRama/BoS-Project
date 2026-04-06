@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Search, Eye, Smartphone } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search, Eye, Smartphone, RefreshCw } from 'lucide-react';
 import KPICard from '../../../components/ui/KPICard';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import Modal from '../../../components/ui/Modal';
 import { DollarSign, TrendingUp, TrendingDown, Clock } from 'lucide-react';
-import { transactions } from '../../../data/mockData';
+import { api } from '../../../api/client';
 import type { Transaction } from '../../../types';
 
 const ITEMS_PER_PAGE = 10;
@@ -43,8 +43,36 @@ const DealerTransactions: React.FC = () => {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [allTx, setAllTx] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  const allTx = transactions;
+  const fetchTransactions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<{ data: unknown[] }>('/transactions?limit=200&dealerId=D002');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setAllTx(res.data.map((t: any) => ({
+        ...t,
+        type: t.type === 'BuyUSD' ? 'Buy USD' : 'Sell USD',
+        telcoOperator: t.telcoOperator,
+        walletType: t.walletType === 'eDahab' ? 'e-Dahab' : t.walletType,
+        dealerName: t.dealer?.name ?? t.dealerName ?? '',
+      })) as Transaction[]);
+      setLastRefresh(new Date());
+    } catch {
+      // backend not available — leave existing data
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTransactions();
+    // Poll every 10 seconds for new USSD transactions
+    const interval = setInterval(fetchTransactions, 10000);
+    return () => clearInterval(interval);
+  }, [fetchTransactions]);
 
   const filtered = allTx.filter(tx => {
     const matchType   = filterType   === 'All' || tx.type           === filterType;
@@ -67,9 +95,19 @@ const DealerTransactions: React.FC = () => {
 
   return (
     <div className="p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Complete transaction history with customer mobile &amp; telco details</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Transactions</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Complete transaction history with customer mobile &amp; telco details</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">Last updated: {lastRefresh.toLocaleTimeString()}</span>
+          <button onClick={fetchTransactions} disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}

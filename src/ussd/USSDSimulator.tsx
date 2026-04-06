@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Phone, RefreshCw, Clock, Wifi, Battery, Signal } from 'lucide-react';
+import { Phone, RefreshCw, Clock, Wifi, Battery, Signal, AlertCircle } from 'lucide-react';
 import { dealers } from '../data/mockData';
+import { api } from '../api/client';
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,8 @@ const USSDSimulator: React.FC = () => {
   const [txSls, setTxSls] = useState(0);
   const [txType, setTxType] = useState<'BUY' | 'SELL'>('BUY');
   const [lastRef, setLastRef] = useState('');
+  const [apiStatus, setApiStatus] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [apiError, setApiError] = useState('');
 
   const historyEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,6 +96,65 @@ const USSDSimulator: React.FC = () => {
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [history]);
+
+  // ─── POST TRANSACTION TO BACKEND ───────────────────────────────────────────
+  const postTransaction = async (
+    type: 'BuyUSD' | 'SellUSD',
+    amount: number,
+    dealer: SimDealer,
+    rate: number,
+    slsAmount: number,
+    pin: string
+  ): Promise<boolean> => {
+    setApiStatus('loading');
+    setApiError('');
+    try {
+      const telco = mobileNumber.startsWith('063') ? 'Telesom' : 'Somtel';
+      const walletType = telco === 'Telesom' ? 'Zaad' : 'eDahab';
+      const result = await api.post<{ transaction: { ref: string }; amlTriggered: boolean }>(
+        '/ussd/simulate',
+        {
+          mobileNumber,
+          telcoOperator: telco,
+          walletType,
+          customerWallet: mobileNumber,
+          type,
+          amountUSD: amount,
+          dealerId: dealer.id,
+          pin,
+        }
+      );
+      setLastRef(result.transaction.ref);
+      setTransactions(prev => [{
+        ref: result.transaction.ref,
+        type: type === 'BuyUSD' ? 'BUY' : 'SELL',
+        usdAmount: amount,
+        slsAmount,
+        rate,
+        dealerName: dealer.name,
+        mobileNumber,
+        timestamp: new Date().toLocaleTimeString(),
+        status: 'Success',
+      }, ...prev]);
+      setApiStatus('idle');
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Backend unavailable';
+      setApiError(msg);
+      setApiStatus('error');
+      // Fallback to local state so simulator still works
+      const ref = `TXN-${Date.now().toString().slice(-8)}`;
+      setLastRef(ref);
+      setTransactions(prev => [{
+        ref, type: type === 'BuyUSD' ? 'BUY' : 'SELL',
+        usdAmount: amount, slsAmount, rate,
+        dealerName: dealer.name, mobileNumber,
+        timestamp: new Date().toLocaleTimeString(),
+        status: 'Success',
+      }, ...prev]);
+      return false;
+    }
+  };
 
   // ─── SCREEN CONTENT ────────────────────────────────────────────────────────
 
@@ -341,15 +403,8 @@ const USSDSimulator: React.FC = () => {
         if (val.length === 4 && /^\d{4}$/.test(val)) {
           const cost = Math.round(txAmount * txRate);
           if (wallet.sls >= cost) {
-            const ref = generateRef();
-            setLastRef(ref);
             setWallet(prev => ({ usd: prev.usd + txAmount, sls: prev.sls - cost }));
-            setTransactions(prev => [{
-              ref, type: 'BUY', usdAmount: txAmount, slsAmount: cost,
-              rate: txRate, dealerName: selectedDealer.name,
-              mobileNumber, timestamp: new Date().toLocaleTimeString(),
-              status: 'Success',
-            }, ...prev]);
+            postTransaction('BuyUSD', txAmount, selectedDealer, txRate, cost, val);
             next = 'buy_success';
           } else {
             next = 'buy_insufficient';
@@ -392,15 +447,8 @@ const USSDSimulator: React.FC = () => {
         if (val.length === 4 && /^\d{4}$/.test(val)) {
           if (wallet.usd >= txAmount) {
             const received = Math.round(txAmount * txRate);
-            const ref = generateRef();
-            setLastRef(ref);
             setWallet(prev => ({ usd: prev.usd - txAmount, sls: prev.sls + received }));
-            setTransactions(prev => [{
-              ref, type: 'SELL', usdAmount: txAmount, slsAmount: received,
-              rate: txRate, dealerName: selectedDealer.name,
-              mobileNumber, timestamp: new Date().toLocaleTimeString(),
-              status: 'Success',
-            }, ...prev]);
+            postTransaction('SellUSD', txAmount, selectedDealer, txRate, received, val);
             next = 'sell_success';
           } else {
             next = 'sell_insufficient';
@@ -636,9 +684,20 @@ const USSDSimulator: React.FC = () => {
               <div className="px-5 py-3.5 border-b border-gray-800 flex items-center gap-2">
                 <Clock size={14} className="text-gray-500" />
                 <h2 className="text-white text-sm font-semibold">Transaction Log</h2>
-                <span className="ml-auto bg-gray-800 text-gray-400 text-xs px-2 py-0.5 rounded-full border border-gray-700">
-                  {transactions.length} tx
-                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  {apiStatus === 'loading' && <span className="text-xs text-yellow-400 animate-pulse">Saving...</span>}
+                  {apiStatus === 'error' && (
+                    <span className="flex items-center gap-1 text-xs text-red-400" title={apiError}>
+                      <AlertCircle size={11} /> Offline mode
+                    </span>
+                  )}
+                  {apiStatus === 'idle' && transactions.length > 0 && (
+                    <span className="text-xs text-green-400">✓ Synced</span>
+                  )}
+                  <span className="bg-gray-800 text-gray-400 text-xs px-2 py-0.5 rounded-full border border-gray-700">
+                    {transactions.length} tx
+                  </span>
+                </div>
               </div>
 
               {transactions.length === 0 ? (
