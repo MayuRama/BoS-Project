@@ -1,13 +1,15 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Bell, LogOut, User } from 'lucide-react';
 
 const DealerHeader: React.FC = () => {
-  const navigate = useNavigate();
-
   const handleLogout = () => {
     localStorage.removeItem('dealer_logged_in');
-    navigate('/dealer-portal/login');
+    localStorage.removeItem('dealer_id');
+    localStorage.removeItem('dealer_username');
+    localStorage.removeItem('dealer_fullName');
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    window.location.replace('/dealer-portal/login');
   };
 
   return (

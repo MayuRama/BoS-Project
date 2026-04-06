@@ -1,14 +1,13 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../../config/database';
-import { verifyJWT, requireCB } from '../../middleware/auth';
+import { verifyJWT, requireCB, optionalJWT } from '../../middleware/auth';
 import { emitRateUpdated } from '../../socket/socket';
 
 const router = Router();
-router.use(verifyJWT);
 
-// GET /api/rates/controls
-router.get('/controls', async (req: Request, res: Response, next: NextFunction) => {
+// GET /api/rates/controls — public read
+router.get('/controls', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const control = await prisma.rateControl.findFirst({
       where: { isActive: true },
@@ -19,7 +18,7 @@ router.get('/controls', async (req: Request, res: Response, next: NextFunction) 
 });
 
 // PUT /api/rates/controls (CB only)
-router.put('/controls', requireCB, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/controls', verifyJWT, requireCB, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = z.object({
       buyFloor: z.number(),
@@ -43,7 +42,7 @@ router.put('/controls', requireCB, async (req: Request, res: Response, next: Nex
 });
 
 // GET /api/rates/history
-router.get('/history', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/history', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const days = parseInt(String(req.query.days || '30'));
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -57,7 +56,7 @@ router.get('/history', async (req: Request, res: Response, next: NextFunction) =
 });
 
 // POST /api/rates/history — append a snapshot
-router.post('/history', requireCB, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/history', verifyJWT, requireCB, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = z.object({
       date: z.string(),

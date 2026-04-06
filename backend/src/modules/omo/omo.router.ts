@@ -1,12 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../../config/database';
-import { verifyJWT, requireCB } from '../../middleware/auth';
+import { verifyJWT, requireCB, optionalJWT } from '../../middleware/auth';
 import { getPageParams, paginate } from '../../utils/helpers';
 import { emitOMOStatusChanged, emitOMOAllocated, emitNotification } from '../../socket/socket';
 
 const router = Router();
-router.use(verifyJWT);
 
 const sessionSchema = z.object({
   id: z.string().optional(),
@@ -22,7 +21,7 @@ const sessionSchema = z.object({
 });
 
 // GET /api/omo-sessions
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page, limit, skip } = getPageParams(req.query);
     const { status, type } = req.query;
@@ -47,7 +46,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // GET /api/omo-sessions/:id
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const session = await prisma.oMOSession.findUnique({
       where: { id: req.params.id },
@@ -62,7 +61,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /api/omo-sessions (CB only)
-router.post('/', requireCB, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', verifyJWT, requireCB, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = sessionSchema.parse(req.body);
     const id = data.id || `OMO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
@@ -100,7 +99,7 @@ router.post('/', requireCB, async (req: Request, res: Response, next: NextFuncti
 });
 
 // PUT /api/omo-sessions/:id (CB only)
-router.put('/:id', requireCB, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', verifyJWT, requireCB, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const data = sessionSchema.partial().parse(req.body);
     const session = await prisma.oMOSession.update({
@@ -115,7 +114,7 @@ router.put('/:id', requireCB, async (req: Request, res: Response, next: NextFunc
 });
 
 // PATCH /api/omo-sessions/:id/cancel (CB only)
-router.patch('/:id/cancel', requireCB, async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/:id/cancel', verifyJWT, requireCB, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const session = await prisma.oMOSession.update({
       where: { id: req.params.id },
@@ -127,7 +126,7 @@ router.patch('/:id/cancel', requireCB, async (req: Request, res: Response, next:
 });
 
 // POST /api/omo-sessions/:id/allocate (CB only) — allocation engine
-router.post('/:id/allocate', requireCB, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/allocate', verifyJWT, requireCB, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const session = await prisma.oMOSession.findUnique({
       where: { id: req.params.id },
@@ -214,7 +213,7 @@ router.post('/:id/allocate', requireCB, async (req: Request, res: Response, next
 // ─── OMO BIDS ────────────────────────────────────────────────────────────────
 
 // GET /api/omo-sessions/:id/bids
-router.get('/:id/bids', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id/bids', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const where: Record<string, unknown> = { sessionId: req.params.id };
     if (req.user!.dealerId) where.dealerId = req.user!.dealerId; // dealers see only their bid
@@ -228,9 +227,9 @@ router.get('/:id/bids', async (req: Request, res: Response, next: NextFunction) 
 });
 
 // POST /api/omo-sessions/:id/bids (dealer only)
-router.post('/:id/bids', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/:id/bids', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.user!.dealerId) { res.status(403).json({ error: 'Only dealers can submit bids' }); return; }
+    if (!req.user?.dealerId) { res.status(403).json({ error: 'Only dealers can submit bids' }); return; }
 
     const { bidAmount, wallet } = z.object({
       bidAmount: z.number().positive(),
@@ -277,7 +276,7 @@ router.delete('/:id/bids/:bidId', async (req: Request, res: Response, next: Next
 });
 
 // GET /api/omo-sessions/:id/results
-router.get('/:id/results', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/:id/results', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const where: Record<string, unknown> = { sessionId: req.params.id };
     if (req.user!.dealerId) where.dealerId = req.user!.dealerId;
