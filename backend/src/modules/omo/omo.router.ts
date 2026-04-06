@@ -216,7 +216,7 @@ router.post('/:id/allocate', verifyJWT, requireCB, async (req: Request, res: Res
 router.get('/:id/bids', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const where: Record<string, unknown> = { sessionId: req.params.id };
-    if (req.user!.dealerId) where.dealerId = req.user!.dealerId; // dealers see only their bid
+    if (req.user?.dealerId) where.dealerId = req.user.dealerId; // dealers see only their own bid
 
     const bids = await prisma.oMOBid.findMany({
       where,
@@ -231,9 +231,9 @@ router.post('/:id/bids', optionalJWT, async (req: Request, res: Response, next: 
   try {
     if (!req.user?.dealerId) { res.status(403).json({ error: 'Only dealers can submit bids' }); return; }
 
-    const { bidAmount, wallet } = z.object({
+    const { bidAmount } = z.object({
       bidAmount: z.number().positive(),
-      wallet: z.enum(['Zaad', 'eDahab', 'Both']),
+      wallet: z.string().optional(), // accepted but not stored (OMOBid schema has no wallet field)
     }).parse(req.body);
 
     const session = await prisma.oMOSession.findUnique({ where: { id: req.params.id } });
@@ -253,9 +253,9 @@ router.post('/:id/bids', optionalJWT, async (req: Request, res: Response, next: 
       where: { sessionId_dealerId: { sessionId: req.params.id, dealerId: req.user!.dealerId } },
       create: {
         sessionId: req.params.id, dealerId: req.user!.dealerId,
-        tier: dealer.tier, bidAmount, wallet, status: 'Submitted',
+        tier: dealer.tier, bidAmount, status: 'Submitted',
       },
-      update: { bidAmount, wallet, status: 'Submitted' },
+      update: { bidAmount, status: 'Submitted' },
     });
 
     res.status(201).json(bid);
@@ -279,7 +279,7 @@ router.delete('/:id/bids/:bidId', async (req: Request, res: Response, next: Next
 router.get('/:id/results', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const where: Record<string, unknown> = { sessionId: req.params.id };
-    if (req.user!.dealerId) where.dealerId = req.user!.dealerId;
+    if (req.user?.dealerId) where.dealerId = req.user.dealerId;
 
     const results = await prisma.allocationResult.findMany({
       where,

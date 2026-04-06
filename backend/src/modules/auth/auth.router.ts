@@ -43,11 +43,13 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
       dealerId: user.dealerId ?? undefined,
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const accessToken = jwt.sign(payload, process.env.JWT_ACCESS_SECRET!, {
-      expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m',
+      expiresIn: (process.env.JWT_ACCESS_EXPIRY || '8h') as any,
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, {
-      expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d',
+      expiresIn: (process.env.JWT_REFRESH_EXPIRY || '7d') as any,
     });
 
     res.json({
@@ -84,7 +86,8 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     const newAccessToken = jwt.sign(
       { userId: payload.userId, username: payload.username, role: payload.role, dealerId: payload.dealerId },
       process.env.JWT_ACCESS_SECRET!,
-      { expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { expiresIn: (process.env.JWT_ACCESS_EXPIRY || '8h') as any }
     );
 
     res.json({ accessToken: newAccessToken });
