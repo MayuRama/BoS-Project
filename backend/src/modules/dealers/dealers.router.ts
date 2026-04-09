@@ -48,6 +48,55 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/dealers/wallet — authenticated dealer's wallet balances + ledger
+router.get('/wallet', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user?.dealerId) { res.status(403).json({ error: 'Dealer authentication required' }); return; }
+
+    const [dealer, ledger] = await Promise.all([
+      prisma.dealer.findUnique({
+        where: { id: req.user.dealerId },
+        select: {
+          id: true, name: true, walletProvider: true,
+          zaadWallet: true, zaadBalanceUSD: true,
+          eDahabWallet: true, eDahabBalanceUSD: true,
+        },
+      }),
+      prisma.walletLedger.findMany({
+        where: { dealerId: req.user.dealerId },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+      }),
+    ]);
+
+    if (!dealer) { res.status(404).json({ error: 'Dealer not found' }); return; }
+
+    const zaadBalance   = Number(dealer.zaadBalanceUSD);
+    const eDahabBalance = Number(dealer.eDahabBalanceUSD);
+
+    res.json({
+      walletProvider: dealer.walletProvider,
+      wallets: [
+        ...(dealer.walletProvider !== 'eDahab' ? [{
+          type: 'Zaad', address: dealer.zaadWallet,
+          balanceUSD: zaadBalance, network: 'Telesom',
+        }] : []),
+        ...(dealer.walletProvider !== 'Zaad' ? [{
+          type: 'eDahab', address: dealer.eDahabWallet,
+          balanceUSD: eDahabBalance, network: 'Somtel',
+        }] : []),
+      ],
+      totalBalanceUSD: zaadBalance + eDahabBalance,
+      ledger: ledger.map(l => ({
+        id: l.id, walletType: l.walletType, entryType: l.entryType,
+        amountUSD: Number(l.amountUSD), reference: l.reference,
+        description: l.description, balanceAfter: Number(l.balanceAfter),
+        createdAt: l.createdAt.toISOString(),
+      })),
+    });
+  } catch (err) { next(err); }
+});
+
 // GET /api/dealers/:id
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {

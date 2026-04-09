@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import prisma from '../../config/database';
 import { generateRefNumber, generateAlertCode } from '../../utils/helpers';
-import { runAMLChecks } from '../../utils/amlRules';
+import { runAMLChecks, AMLThresholds } from '../../utils/amlRules';
 import { emitTransactionNew, emitAMLAlert } from '../../socket/socket';
 
 const router = Router();
@@ -84,31 +84,61 @@ router.post('/simulate', async (req: Request, res: Response, next: NextFunction)
       return transaction;
     });
 
-    // AML checks
+    // AML checks — gather recent activity for rule evaluation
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const oneDayAgo  = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const [recentCount, recentAmounts] = await Promise.all([
-      prisma.transaction.count({
+    const [recentMobileTxs, recentWalletTxs, amlSettings] = await Promise.all([
+      prisma.transaction.findMany({
         where: { mobileNumber: data.mobileNumber, timestamp: { gte: oneHourAgo }, id: { not: tx.id } },
+        select: { id: true, amountUSD: true },
       }),
       prisma.transaction.findMany({
         where: { customerWallet: data.customerWallet, timestamp: { gte: oneDayAgo }, id: { not: tx.id } },
-        select: { amountUSD: true },
+        select: { id: true, amountUSD: true },
+      }),
+      prisma.systemSetting.findMany({
+        where: { key: { in: ['aml_threshold', 'velocity_limit', 'structuring_count'] } },
       }),
     ]);
+
+    const settingsMap = Object.fromEntries(amlSettings.map(s => [s.key, Number(s.value)]));
+    const thresholds: AMLThresholds = {
+      amlThreshold:    settingsMap['aml_threshold']    ?? 50000,
+      velocityLimit:   settingsMap['velocity_limit']   ?? 5,
+      structuringCount: settingsMap['structuring_count'] ?? 5,
+    };
 
     const amlTrigger = runAMLChecks({
       amountUSD: data.amountUSD,
       mobileNumber: data.mobileNumber,
       customerWallet: data.customerWallet,
       dealerId: data.dealerId,
-      recentTxCount: recentCount,
-      recentTxAmounts: recentAmounts.map(t => Number(t.amountUSD)),
-    });
+      recentTxCount: recentMobileTxs.length,
+      recentTxAmounts: recentWalletTxs.map(t => Number(t.amountUSD)),
+    }, thresholds);
 
     let amlAlert = null;
+    let finalStatus = tx.status;
+
     if (amlTrigger?.triggered) {
+      // Hold the flagged transaction in Pending
+      await prisma.transaction.update({ where: { id: tx.id }, data: { status: 'Pending' } });
+      finalStatus = 'Pending';
+
+      // Collect all triggering transaction IDs (not just the current one)
+      let triggeringIds: string[] = [tx.id];
+      if (amlTrigger.type === 'VelocityCheck' || amlTrigger.type === 'UnusualFrequency') {
+        triggeringIds = [tx.id, ...recentMobileTxs.map(t => t.id)];
+      } else if (amlTrigger.type === 'StructuringPattern') {
+        const structuring = recentWalletTxs.filter(
+          t => Number(t.amountUSD) >= 8000 && Number(t.amountUSD) <= 10000
+        );
+        triggeringIds = [tx.id, ...structuring.map(t => t.id)];
+      }
+      // Deduplicate
+      triggeringIds = [...new Set(triggeringIds)];
+
       amlAlert = await prisma.aMLAlert.create({
         data: {
           alertCode: generateAlertCode(),
@@ -120,14 +150,14 @@ router.post('/simulate', async (req: Request, res: Response, next: NextFunction)
           triggerRule: amlTrigger.triggerRule,
           priority: amlTrigger.priority,
           status: 'New',
-          transactions: { create: { transactionId: tx.id } },
+          transactions: { create: triggeringIds.map(transactionId => ({ transactionId })) },
         },
       });
       emitAMLAlert(amlAlert);
     }
 
-    // Emit real-time events to both portals
-    emitTransactionNew(tx);
+    // Emit real-time event (with updated status)
+    emitTransactionNew({ ...tx, status: finalStatus });
 
     // Shape response to match frontend SimTransaction interface
     res.status(201).json({
@@ -143,9 +173,10 @@ router.post('/simulate', async (req: Request, res: Response, next: NextFunction)
         telcoOperator: tx.telcoOperator,
         walletType: tx.walletType,
         timestamp: tx.timestamp.toISOString(),
-        status: tx.status,
+        status: finalStatus,
       },
       amlTriggered: !!amlAlert,
+      alertCode: amlAlert?.alertCode ?? null,
     });
   } catch (err) { next(err); }
 });

@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Bank of Somaliland FX Platform - Backend API",
   "main": "dist/index.js",
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",

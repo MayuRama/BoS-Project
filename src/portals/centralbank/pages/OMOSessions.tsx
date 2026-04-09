@@ -128,9 +128,18 @@ const CreateOMOModal: React.FC<CreateOMOModalProps> = ({ isOpen, onClose, onCrea
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-bos-green/30" required />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Fixed Exchange Rate (SL/USD)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {form.allocationMethod === 'BestBidPriceWins' ? 'Baseline Rate (SL/USD)' : 'Fixed Rate (SL/USD)'}
+            </label>
             <input type="number" placeholder="e.g. 570" value={form.fixedRate} onChange={e => setForm(f => ({ ...f, fixedRate: e.target.value }))}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-bos-green/30" required />
+            <p className="text-xs text-gray-400 mt-1">
+              {form.allocationMethod === 'BestBidPriceWins'
+                ? form.type === 'Injection'
+                  ? 'Dealers must bid at or above this rate. Highest rates win.'
+                  : 'Dealers must bid at or below this rate. Lowest rates win.'
+                : 'All dealers settle at this single rate.'}
+            </p>
           </div>
         </div>
 
@@ -167,11 +176,19 @@ const CreateOMOModal: React.FC<CreateOMOModalProps> = ({ isOpen, onClose, onCrea
         {/* Allocation Method */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Allocation Method</label>
-          <div className="flex gap-4">
-            {[{ label: 'Equal Distribution', val: 'EqualDistribution' }, { label: 'Best Bid Price Wins', val: 'BestBidPriceWins' }].map(m => (
-              <label key={m.val} className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" name="alloc" value={m.val} checked={form.allocationMethod === m.val} onChange={e => setForm(f => ({ ...f, allocationMethod: e.target.value }))} className="accent-bos-green" />
-                <span className="text-sm text-gray-700">{m.label}</span>
+          <div className="flex gap-6">
+            {[
+              { label: 'Allotment', val: 'EqualDistribution', hint: 'Each dealer receives a proportional share based on their bid amount.' },
+              { label: 'Best Bid Price Wins', val: 'BestBidPriceWins', hint: 'Dealers submit a competitive rate. Best rates are filled first.' },
+            ].map(m => (
+              <label key={m.val} className="flex items-start gap-2 cursor-pointer">
+                <input type="radio" name="alloc" value={m.val} checked={form.allocationMethod === m.val}
+                  onChange={e => setForm(f => ({ ...f, allocationMethod: e.target.value }))}
+                  className="accent-bos-green mt-0.5" />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">{m.label}</span>
+                  <p className="text-xs text-gray-400">{m.hint}</p>
+                </div>
               </label>
             ))}
           </div>
@@ -309,7 +326,7 @@ const OMOSessions: React.FC = () => {
                   <td className="px-4 py-3 text-gray-500 text-xs">{s.startTime.replace('T', ' ').slice(0, 16)}</td>
                   <td className="px-4 py-3 text-gray-500">{s.durationMinutes} min</td>
                   <td className="px-4 py-3 text-xs text-gray-500">
-                    {s.allocationMethod === 'EqualDistribution' ? 'Equal Dist.' : 'Best Bid'}
+                    {s.allocationMethod === 'EqualDistribution' ? 'Allotment' : 'Best Bid'}
                   </td>
                   <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
                   <td className="px-4 py-3 text-gray-600">{s._count?.bids ?? 0}</td>

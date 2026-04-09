@@ -14,25 +14,36 @@ export interface AMLTrigger {
   triggerRule: string;
 }
 
-const AML_THRESHOLD = 50000;
-const VELOCITY_LIMIT = 5;
+export interface AMLThresholds {
+  amlThreshold?: number;
+  velocityLimit?: number;
+  structuringCount?: number;
+}
+
+// Default fallback values (used when DB settings are unavailable)
+const DEFAULT_AML_THRESHOLD = 50000;
+const DEFAULT_VELOCITY_LIMIT = 5;
 const STRUCTURING_MIN = 8000;
 const STRUCTURING_MAX = 10000;
-const STRUCTURING_COUNT = 5;
+const DEFAULT_STRUCTURING_COUNT = 5;
 
-export const runAMLChecks = (input: AMLCheckInput): AMLTrigger | null => {
+export const runAMLChecks = (input: AMLCheckInput, thresholds?: AMLThresholds): AMLTrigger | null => {
+  const amlThreshold    = thresholds?.amlThreshold    ?? DEFAULT_AML_THRESHOLD;
+  const velocityLimit   = thresholds?.velocityLimit   ?? DEFAULT_VELOCITY_LIMIT;
+  const structuringCount = thresholds?.structuringCount ?? DEFAULT_STRUCTURING_COUNT;
+
   // Rule 1: Large transaction threshold
-  if (input.amountUSD >= AML_THRESHOLD) {
+  if (input.amountUSD >= amlThreshold) {
     return {
       triggered: true,
       type: 'ThresholdExceeded',
       priority: 'High',
-      triggerRule: `Transaction amount $${input.amountUSD.toLocaleString()} exceeds threshold of $${AML_THRESHOLD.toLocaleString()}`,
+      triggerRule: `Transaction amount $${input.amountUSD.toLocaleString()} exceeds threshold of $${amlThreshold.toLocaleString()}`,
     };
   }
 
   // Rule 2: Velocity check — too many transactions from same mobile in 60 min
-  if (input.recentTxCount >= VELOCITY_LIMIT) {
+  if (input.recentTxCount >= velocityLimit) {
     return {
       triggered: true,
       type: 'VelocityCheck',
@@ -55,7 +66,7 @@ export const runAMLChecks = (input: AMLCheckInput): AMLTrigger | null => {
   const structuringTxs = input.recentTxAmounts.filter(
     a => a >= STRUCTURING_MIN && a <= STRUCTURING_MAX
   );
-  if (structuringTxs.length >= STRUCTURING_COUNT) {
+  if (structuringTxs.length >= structuringCount) {
     return {
       triggered: true,
       type: 'StructuringPattern',

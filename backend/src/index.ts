@@ -18,6 +18,7 @@ import auditRouter from './modules/audit/audit.router';
 import notificationsRouter from './modules/notifications/notifications.router';
 import settingsRouter from './modules/settings/settings.router';
 import ussdRouter from './modules/ussd/ussd.router';
+import dashboardRouter from './modules/dashboard/dashboard.router';
 
 const app = express();
 const server = http.createServer(app);
@@ -42,6 +43,7 @@ app.use('/api/audit-logs', auditRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/ussd', ussdRouter);
+app.use('/api/dashboard', dashboardRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {

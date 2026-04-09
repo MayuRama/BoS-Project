@@ -55,6 +55,9 @@ const DealerTransactions: React.FC = () => {
       setAllTx(res.data.map((t: any) => ({
         ...t,
         type: t.type === 'BuyUSD' ? 'Buy USD' : 'Sell USD',
+        amountUSD: Number(t.amountUSD),
+        amountSL:  Number(t.amountSL),
+        rate:      Number(t.rate),
         telcoOperator: t.telcoOperator,
         walletType: t.walletType === 'eDahab' ? 'e-Dahab' : t.walletType,
         dealerName: t.dealer?.name ?? t.dealerName ?? '',

@@ -113,6 +113,15 @@ export const api = {
     return res.json();
   },
 
+  async delete<T>(path: string): Promise<T> {
+    const token = await ensureToken();
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method: 'DELETE', headers: headers(token, false),
+    });
+    if (!res.ok) return handleError(res);
+    return res.json();
+  },
+
   /** Pre-warm the service token for this portal (call on app load). */
   async warmup(): Promise<void> {
     const portal = getPortal();

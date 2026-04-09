@@ -152,13 +152,15 @@ model Dealer {
   zaadWallet      String?
   eDahabWallet    String?
   registeredDate  DateTime
-  volume30d       Decimal        @db.Decimal(15, 2) @default(0)
-  txCount30d      Int            @default(0)
-  complianceScore Int            @default(100)
-  contactEmail    String
-  contactPhone    String
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  volume30d        Decimal        @db.Decimal(15, 2) @default(0)
+  txCount30d       Int            @default(0)
+  complianceScore  Int            @default(100)
+  zaadBalanceUSD   Decimal        @db.Decimal(15, 2) @default(0)
+  eDahabBalanceUSD Decimal        @db.Decimal(15, 2) @default(0)
+  contactEmail     String
+  contactPhone     String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   users             User[]
   transactions      Transaction[]
@@ -166,6 +168,7 @@ model Dealer {
   amlAlerts         AMLAlert[]
   notifications     Notification[]
   allocationResults AllocationResult[]
+  walletLedger      WalletLedger[]
 
   @@index([status])
   @@index([tier])
@@ -208,6 +211,8 @@ model OMOBid {
   dealer          Dealer         @relation(fields: [dealerId], references: [id])
   tier            DealerTier
   bidAmount       Decimal        @db.Decimal(15, 2)
+  bidRate         Decimal?       @db.Decimal(10, 4)   // competitive rate submitted by dealer (BestBidPriceWins only)
+  walletChoice    WalletType?                         // wallet dealer wants allocation credited/debited to
   allocatedAmount Decimal?       @db.Decimal(15, 2)
   status          BidStatus      @default(Submitted)
   submittedAt     DateTime       @default(now())
@@ -304,6 +309,24 @@ model AMLAlertTransaction {
   transaction   Transaction @relation(fields: [transactionId], references: [id])
 
   @@id([alertId, transactionId])
+}
+
+// ─── WALLET LEDGER ───────────────────────────────────────────────────────────
+
+model WalletLedger {
+  id           String     @id @default(cuid())
+  dealerId     String
+  dealer       Dealer     @relation(fields: [dealerId], references: [id])
+  walletType   WalletType
+  entryType    String     // 'Credit' | 'Debit'
+  amountUSD    Decimal    @db.Decimal(15, 2)
+  reference    String     // session ID or transaction ref
+  description  String
+  balanceAfter Decimal    @db.Decimal(15, 2)
+  createdAt    DateTime   @default(now())
+
+  @@index([dealerId])
+  @@index([createdAt])
 }
 
 // ─── RATE CONTROLS ───────────────────────────────────────────────────────────

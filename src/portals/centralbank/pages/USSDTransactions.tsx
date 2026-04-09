@@ -42,6 +42,9 @@ const USSDTransactions: React.FC = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setAllTransactions(res.data.map((t: any) => ({
         ...t,
+        amountUSD: Number(t.amountUSD),   // Prisma Decimal → string from API, must convert
+        amountSL:  Number(t.amountSL),
+        rate:      Number(t.rate),
         type: t.type === 'BuyUSD' ? 'Buy USD' : 'Sell USD',
         walletType: t.walletType === 'eDahab' ? 'e-Dahab' : t.walletType,
         dealerName: t.dealer?.name ?? t.dealerName ?? '',

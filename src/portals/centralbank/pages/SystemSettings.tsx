@@ -1,11 +1,24 @@
-import React, { useState } from 'react';
-import { Save, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Save, CheckCircle, Loader } from 'lucide-react';
+import { api } from '../../../api/client';
+
+interface SystemSettingRow {
+  key: string;
+  value: string;
+  label: string;
+  category: string;
+}
 
 const SystemSettings: React.FC = () => {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [settings, setSettings] = useState({
     amlThreshold: 50000,
-    velocityLimit: 3,
+    velocityLimit: 5,
+    structuringCount: 5,
     sessionTimeout: 30,
     smsEnabled: true,
     ussdEnabled: true,
@@ -14,10 +27,53 @@ const SystemSettings: React.FC = () => {
     auditRetentionDays: 365,
   });
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  const fetchSettings = useCallback(async () => {
+    try {
+      const rows = await api.get<SystemSettingRow[]>('/settings');
+      const map = Object.fromEntries(rows.map((s: SystemSettingRow) => [s.key, s.value]));
+      setSettings(prev => ({
+        ...prev,
+        amlThreshold:    map['aml_threshold']    ? Number(map['aml_threshold'])    : prev.amlThreshold,
+        velocityLimit:   map['velocity_limit']   ? Number(map['velocity_limit'])   : prev.velocityLimit,
+        structuringCount: map['structuring_count'] ? Number(map['structuring_count']) : prev.structuringCount,
+        sessionTimeout:  map['session_timeout']  ? Number(map['session_timeout'])  : prev.sessionTimeout,
+      }));
+    } catch (err) {
+      setError('Failed to load settings from server.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.put('/settings', [
+        { key: 'aml_threshold',    value: String(settings.amlThreshold) },
+        { key: 'velocity_limit',   value: String(settings.velocityLimit) },
+        { key: 'structuring_count', value: String(settings.structuringCount) },
+        { key: 'session_timeout',  value: String(settings.sessionTimeout) },
+      ]);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      setError('Failed to save settings. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center h-64">
+        <Loader size={20} className="animate-spin text-bos-green mr-2" />
+        <span className="text-gray-500 text-sm">Loading settings...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -25,6 +81,12 @@ const SystemSettings: React.FC = () => {
         <h1 className="text-2xl font-bold text-gray-900">System Settings</h1>
         <p className="text-sm text-gray-500 mt-0.5">Platform-wide configuration and controls</p>
       </div>
+
+      {error && (
+        <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* AML Settings */}
@@ -43,6 +105,14 @@ const SystemSettings: React.FC = () => {
               <input type="number" value={settings.velocityLimit}
                 onChange={e => setSettings(p => ({ ...p, velocityLimit: Number(e.target.value) }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-bos-green/30" />
+              <p className="text-xs text-gray-400 mt-1">Number of transactions from same mobile in 60 min before VelocityCheck alert</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Structuring Pattern Count</label>
+              <input type="number" value={settings.structuringCount}
+                onChange={e => setSettings(p => ({ ...p, structuringCount: Number(e.target.value) }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-bos-green/30" />
+              <p className="text-xs text-gray-400 mt-1">Number of $8K–$10K transactions in 24h before StructuringPattern alert</p>
             </div>
           </div>
         </div>
@@ -126,9 +196,14 @@ const SystemSettings: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex gap-3">
-        <button onClick={handleSave} className="flex items-center gap-2 bg-bos-green text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-bos-green/90">
-          <Save size={16} /> Save Settings
+      <div className="flex gap-3 items-center">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 bg-bos-green text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-bos-green/90 disabled:opacity-60"
+        >
+          {saving ? <Loader size={16} className="animate-spin" /> : <Save size={16} />}
+          {saving ? 'Saving…' : 'Save Settings'}
         </button>
         {saved && (
           <div className="flex items-center gap-2 text-green-700 text-sm bg-green-50 border border-green-200 rounded-lg px-4 py-2.5">

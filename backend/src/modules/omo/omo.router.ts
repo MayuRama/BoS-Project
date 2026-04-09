@@ -45,6 +45,21 @@ router.get('/', optionalJWT, async (req: Request, res: Response, next: NextFunct
   } catch (err) { next(err); }
 });
 
+// GET /api/omo-sessions/my-bids — all bids for the authenticated dealer across all sessions
+router.get('/my-bids', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user?.dealerId) { res.json([]); return; }
+    const bids = await prisma.oMOBid.findMany({
+      where: { dealerId: req.user.dealerId },
+      include: {
+        session: { select: { id: true, type: true, status: true, fixedRate: true, allocationMethod: true } },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+    res.json(bids);
+  } catch (err) { next(err); }
+});
+
 // GET /api/omo-sessions/:id
 router.get('/:id', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -148,9 +163,12 @@ router.post('/:id/allocate', verifyJWT, requireCB, async (req: Request, res: Res
     }> = [];
 
     if (session.allocationMethod === 'EqualDistribution') {
+      // Allotment (pro-rata): each dealer receives a share proportional to their bid.
+      // If total demand ≤ supply → everyone gets exactly what they requested.
+      // If total demand > supply → each dealer gets (their bid / total demand) × total supply.
       const share = Math.min(1, totalAmount / totalBid);
       for (const bid of bids) {
-        const allocated = Math.min(Number(bid.bidAmount), Number(bid.bidAmount) * share);
+        const allocated = Math.round(Number(bid.bidAmount) * share * 100) / 100;
         results.push({
           sessionId: session.id, dealerId: bid.dealerId,
           bidAmount: Number(bid.bidAmount), allocatedAmount: allocated,
@@ -158,21 +176,68 @@ router.post('/:id/allocate', verifyJWT, requireCB, async (req: Request, res: Res
         });
       }
     } else {
-      // Best bid — sort by amount desc, fill greedily
-      const sorted = [...bids].sort((a, b) => Number(b.bidAmount) - Number(a.bidAmount));
+      // Best Bid Price Wins: rank dealers by their submitted bid rate.
+      // Injection  → dealers offering the HIGHEST rate get priority (they pay the most per USD).
+      // Absorption → dealers offering the LOWEST rate get priority (CB pays them least per USD).
+      // Each dealer settles at their own submitted bid rate.
+      const sorted = [...bids].sort((a, b) => {
+        const aRate = Number(a.bidRate ?? 0);
+        const bRate = Number(b.bidRate ?? 0);
+        return session.type === 'Injection' ? bRate - aRate : aRate - bRate;
+      });
       let remaining = totalAmount;
       for (const bid of sorted) {
         const allocated = Math.min(Number(bid.bidAmount), remaining);
         remaining -= allocated;
+        const dealerRate = Number(bid.bidRate ?? fixedRate); // each dealer's settlement rate is their own bid rate
         results.push({
           sessionId: session.id, dealerId: bid.dealerId,
           bidAmount: Number(bid.bidAmount), allocatedAmount: allocated,
-          fixedRate, slSettlement: allocated * fixedRate,
+          fixedRate: dealerRate,           // stored as the settlement rate for this dealer
+          slSettlement: allocated * dealerRate,
         });
       }
     }
 
-    // Write results in a transaction
+    // ── Wallet balance updates ────────────────────────────────────────────────
+    // Fetch current dealer wallet balances for all affected dealers
+    const dealerIds = [...new Set(bids.map(b => b.dealerId))];
+    const dealerRecords = await prisma.dealer.findMany({
+      where: { id: { in: dealerIds } },
+      select: { id: true, zaadBalanceUSD: true, eDahabBalanceUSD: true, walletProvider: true },
+    });
+    const balanceMap = new Map(dealerRecords.map(d => ({
+      id: d.id, zaad: Number(d.zaadBalanceUSD), eDahab: Number(d.eDahabBalanceUSD),
+      provider: d.walletProvider,
+    })).map(d => [d.id, d]));
+
+    interface WalletUpdate {
+      dealerId: string; walletType: 'Zaad' | 'eDahab';
+      delta: number; newBalance: number;
+    }
+    const walletUpdates: WalletUpdate[] = [];
+
+    for (const result of results) {
+      const bid = bids.find(b => b.dealerId === result.dealerId)!;
+      const bal = balanceMap.get(result.dealerId)!;
+      // Resolve wallet: use bid's walletChoice, else fall back to provider default
+      const walletType = (bid.walletChoice ?? (bal.provider === 'eDahab' ? 'eDahab' : 'Zaad')) as 'Zaad' | 'eDahab';
+      const current = walletType === 'Zaad' ? bal.zaad : bal.eDahab;
+
+      let newBalance: number;
+      if (session.type === 'Injection') {
+        // CB injects USD → dealer wallet balance increases
+        newBalance = current + result.allocatedAmount;
+      } else {
+        // CB absorbs USD → dealer sells USD → wallet balance decreases
+        newBalance = Math.max(0, current - result.allocatedAmount);
+      }
+
+      if (walletType === 'Zaad') bal.zaad = newBalance; else bal.eDahab = newBalance;
+      walletUpdates.push({ dealerId: result.dealerId, walletType, delta: newBalance - current, newBalance });
+    }
+
+    // Write results + wallet updates atomically
     await prisma.$transaction([
       prisma.oMOSession.update({
         where: { id: session.id },
@@ -189,6 +254,29 @@ router.post('/:id/allocate', verifyJWT, requireCB, async (req: Request, res: Res
         });
       }),
       ...results.map(r => prisma.allocationResult.create({ data: r })),
+      // Update dealer wallet balances
+      ...walletUpdates.map(wu =>
+        prisma.dealer.update({
+          where: { id: wu.dealerId },
+          data: wu.walletType === 'Zaad'
+            ? { zaadBalanceUSD: wu.newBalance }
+            : { eDahabBalanceUSD: wu.newBalance },
+        })
+      ),
+      // Create wallet ledger entries
+      ...walletUpdates.map(wu =>
+        prisma.walletLedger.create({
+          data: {
+            dealerId:    wu.dealerId,
+            walletType:  wu.walletType,
+            entryType:   wu.delta >= 0 ? 'Credit' : 'Debit',
+            amountUSD:   Math.abs(wu.delta),
+            reference:   session.id,
+            description: `OMO ${session.type} — ${session.allocationMethod === 'EqualDistribution' ? 'Allotment' : 'Best Bid'} allocation from session ${session.id}`,
+            balanceAfter: wu.newBalance,
+          },
+        })
+      ),
     ]);
 
     // Notify dealers
@@ -231,9 +319,10 @@ router.post('/:id/bids', optionalJWT, async (req: Request, res: Response, next: 
   try {
     if (!req.user?.dealerId) { res.status(403).json({ error: 'Only dealers can submit bids' }); return; }
 
-    const { bidAmount } = z.object({
+    const { bidAmount, bidRate, wallet } = z.object({
       bidAmount: z.number().positive(),
-      wallet: z.string().optional(), // accepted but not stored (OMOBid schema has no wallet field)
+      bidRate:   z.number().positive().optional(),
+      wallet:    z.enum(['Zaad', 'eDahab']).optional(),
     }).parse(req.body);
 
     const session = await prisma.oMOSession.findUnique({ where: { id: req.params.id } });
@@ -249,13 +338,35 @@ router.post('/:id/bids', optionalJWT, async (req: Request, res: Response, next: 
       res.status(400).json({ error: `Bid exceeds maximum allowed: $${maxBid.toLocaleString()}` }); return;
     }
 
+    // BestBidPriceWins: bidRate is mandatory and must compete against the session baseline
+    if (session.allocationMethod === 'BestBidPriceWins') {
+      if (!bidRate) {
+        res.status(400).json({ error: 'A bid rate (SL/USD) is required for Best Bid Price Wins sessions' }); return;
+      }
+      const baselineRate = Number(session.fixedRate);
+      // Injection: dealers are buying USD from CB — they must offer at least the baseline rate
+      if (session.type === 'Injection' && bidRate < baselineRate) {
+        res.status(400).json({ error: `Bid rate SL ${bidRate} is below the session baseline of SL ${baselineRate}. Your rate must be ≥ SL ${baselineRate}` }); return;
+      }
+      // Absorption: CB is buying USD from dealers — dealers must accept at most the baseline rate
+      if (session.type === 'Absorption' && bidRate > baselineRate) {
+        res.status(400).json({ error: `Bid rate SL ${bidRate} exceeds the session baseline of SL ${baselineRate}. Your rate must be ≤ SL ${baselineRate}` }); return;
+      }
+    }
+
+    // Resolve the wallet choice: use what dealer sent, else fall back to their provider
+    const resolvedWallet = wallet ?? (
+      dealer.walletProvider === 'eDahab' ? 'eDahab' : 'Zaad'
+    ) as 'Zaad' | 'eDahab';
+
     const bid = await prisma.oMOBid.upsert({
       where: { sessionId_dealerId: { sessionId: req.params.id, dealerId: req.user!.dealerId } },
       create: {
         sessionId: req.params.id, dealerId: req.user!.dealerId,
-        tier: dealer.tier, bidAmount, status: 'Submitted',
+        tier: dealer.tier, bidAmount, bidRate: bidRate ?? null,
+        walletChoice: resolvedWallet, status: 'Submitted',
       },
-      update: { bidAmount, status: 'Submitted' },
+      update: { bidAmount, bidRate: bidRate ?? null, walletChoice: resolvedWallet, status: 'Submitted' },
     });
 
     res.status(201).json(bid);
@@ -263,12 +374,16 @@ router.post('/:id/bids', optionalJWT, async (req: Request, res: Response, next: 
 });
 
 // DELETE /api/omo-sessions/:id/bids/:bidId
-router.delete('/:id/bids/:bidId', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/:id/bids/:bidId', optionalJWT, async (req: Request, res: Response, next: NextFunction) => {
   try {
+    if (!req.user?.dealerId) { res.status(403).json({ error: 'Only dealers can withdraw bids' }); return; }
     const bid = await prisma.oMOBid.findUnique({ where: { id: req.params.bidId } });
     if (!bid) { res.status(404).json({ error: 'Bid not found' }); return; }
-    if (req.user!.dealerId && bid.dealerId !== req.user!.dealerId) {
+    if (bid.dealerId !== req.user.dealerId) {
       res.status(403).json({ error: 'Access denied' }); return;
+    }
+    if (bid.status !== 'Submitted') {
+      res.status(400).json({ error: 'Only submitted bids can be withdrawn' }); return;
     }
     await prisma.oMOBid.delete({ where: { id: req.params.bidId } });
     res.json({ message: 'Bid withdrawn' });

@@ -73,12 +73,15 @@ async function main() {
   console.log('✅ Rate history seeded');
 
   // ─── DEALERS ───────────────────────────────────────────────────────────────
+  // Wallet balances reflect state after past OMO allocations:
+  //   OMO-2026-001 (Injection): D001 Zaad +$400K, D002 Zaad +$450K, D003 Zaad +$300K
+  //   OMO-2026-002 (Absorption): D001 Zaad -$400K, D004 eDahab -$350K
   const dealerData = [
-    { id: 'D001', name: 'Dahabshiil Exchange', licenseNumber: 'FX-LIC-2019-001', tier: 'Tier1', buyRate: 567, sellRate: 572, dailyLimit: 500000, status: 'Active', walletProvider: 'Both', zaadWallet: '063-4521-001', eDahabWallet: '770-9843-001', registeredDate: '2019-03-15', volume30d: 3850000, txCount30d: 142, complianceScore: 98, contactEmail: 'fx@dahabshiil.com', contactPhone: '+252-63-4521000' },
-    { id: 'D002', name: 'Premier Exchange Co.', licenseNumber: 'FX-LIC-2019-002', tier: 'Tier1', buyRate: 567, sellRate: 572, dailyLimit: 500000, status: 'Active', walletProvider: 'Both', zaadWallet: '063-7712-002', eDahabWallet: '770-3312-002', registeredDate: '2019-05-20', volume30d: 2940000, txCount30d: 118, complianceScore: 97, contactEmail: 'ops@premierexchange.so', contactPhone: '+252-63-7712000' },
-    { id: 'D003', name: 'Amal Bank FX', licenseNumber: 'FX-LIC-2020-003', tier: 'Tier1', buyRate: 566, sellRate: 571, dailyLimit: 450000, status: 'Active', walletProvider: 'Zaad', zaadWallet: '063-5541-003', eDahabWallet: null, registeredDate: '2020-01-10', volume30d: 2210000, txCount30d: 95, complianceScore: 95, contactEmail: 'fx@amalbank.so', contactPhone: '+252-63-5541000' },
-    { id: 'D004', name: 'Salaam Somali Bank FX', licenseNumber: 'FX-LIC-2020-004', tier: 'Tier1', buyRate: 567, sellRate: 572, dailyLimit: 400000, status: 'Active', walletProvider: 'Both', zaadWallet: '063-6632-004', eDahabWallet: '770-4421-004', registeredDate: '2020-06-01', volume30d: 1870000, txCount30d: 76, complianceScore: 94, contactEmail: 'fx@salaambank.so', contactPhone: '+252-63-6632000' },
-    { id: 'D005', name: 'Gulf Remittance Co.', licenseNumber: 'FX-LIC-2021-005', tier: 'Tier2', buyRate: 563, sellRate: 568, dailyLimit: 250000, status: 'Active', walletProvider: 'eDahab', zaadWallet: null, eDahabWallet: '770-2211-005', registeredDate: '2021-02-14', volume30d: 980000, txCount30d: 44, complianceScore: 91, contactEmail: 'ops@gulfremit.so', contactPhone: '+252-68-2211000' },
+    { id: 'D001', name: 'Dahabshiil Exchange',   licenseNumber: 'FX-LIC-2019-001', tier: 'Tier1', buyRate: 567, sellRate: 572, dailyLimit: 500000, status: 'Active', walletProvider: 'Both',   zaadWallet: '063-4521-001', eDahabWallet: '770-9843-001', registeredDate: '2019-03-15', volume30d: 3850000, txCount30d: 142, complianceScore: 98, zaadBalanceUSD: 250000, eDahabBalanceUSD: 150000, contactEmail: 'fx@dahabshiil.com',        contactPhone: '+252-63-4521000' },
+    { id: 'D002', name: 'Premier Exchange Co.',   licenseNumber: 'FX-LIC-2019-002', tier: 'Tier1', buyRate: 567, sellRate: 572, dailyLimit: 500000, status: 'Active', walletProvider: 'Both',   zaadWallet: '063-7712-002', eDahabWallet: '770-3312-002', registeredDate: '2019-05-20', volume30d: 2940000, txCount30d: 118, complianceScore: 97, zaadBalanceUSD: 650000, eDahabBalanceUSD:  85000, contactEmail: 'ops@premierexchange.so', contactPhone: '+252-63-7712000' },
+    { id: 'D003', name: 'Amal Bank FX',          licenseNumber: 'FX-LIC-2020-003', tier: 'Tier1', buyRate: 566, sellRate: 571, dailyLimit: 450000, status: 'Active', walletProvider: 'Zaad',   zaadWallet: '063-5541-003', eDahabWallet: null,            registeredDate: '2020-01-10', volume30d: 2210000, txCount30d:  95, complianceScore: 95, zaadBalanceUSD: 480000, eDahabBalanceUSD:      0, contactEmail: 'fx@amalbank.so',         contactPhone: '+252-63-5541000' },
+    { id: 'D004', name: 'Salaam Somali Bank FX', licenseNumber: 'FX-LIC-2020-004', tier: 'Tier1', buyRate: 567, sellRate: 572, dailyLimit: 400000, status: 'Active', walletProvider: 'Both',   zaadWallet: '063-6632-004', eDahabWallet: '770-4421-004', registeredDate: '2020-06-01', volume30d: 1870000, txCount30d:  76, complianceScore: 94, zaadBalanceUSD: 200000, eDahabBalanceUSD:  50000, contactEmail: 'fx@salaambank.so',       contactPhone: '+252-63-6632000' },
+    { id: 'D005', name: 'Gulf Remittance Co.',   licenseNumber: 'FX-LIC-2021-005', tier: 'Tier2', buyRate: 563, sellRate: 568, dailyLimit: 250000, status: 'Active', walletProvider: 'eDahab', zaadWallet: null,            eDahabWallet: '770-2211-005', registeredDate: '2021-02-14', volume30d:  980000, txCount30d:  44, complianceScore: 91, zaadBalanceUSD:      0, eDahabBalanceUSD: 175000, contactEmail: 'ops@gulfremit.so',       contactPhone: '+252-68-2211000' },
   ];
 
   for (const d of dealerData) {
@@ -94,10 +97,11 @@ async function main() {
       update: {
         buyRate: d.buyRate, sellRate: d.sellRate,
         volume30d: d.volume30d, txCount30d: d.txCount30d,
+        zaadBalanceUSD: d.zaadBalanceUSD, eDahabBalanceUSD: d.eDahabBalanceUSD,
       },
     });
   }
-  console.log('✅ Dealers seeded (D001–D005)');
+  console.log('✅ Dealers seeded (D001–D005) with wallet balances');
 
   // ─── CB USERS ──────────────────────────────────────────────────────────────
   const cbPassword = await bcrypt.hash('admin123', 10);
@@ -165,16 +169,16 @@ async function main() {
 
   // ─── OMO BIDS ──────────────────────────────────────────────────────────────
   const bids = [
-    { sessionId: 'OMO-2026-001', dealerId: 'D001', tier: 'Tier1', bidAmount: 450000, status: 'Allocated', allocatedAmount: 400000, wallet: 'Both' },
-    { sessionId: 'OMO-2026-001', dealerId: 'D002', tier: 'Tier1', bidAmount: 500000, status: 'Allocated', allocatedAmount: 450000, wallet: 'Both' },
-    { sessionId: 'OMO-2026-001', dealerId: 'D003', tier: 'Tier1', bidAmount: 300000, status: 'Allocated', allocatedAmount: 300000, wallet: 'Zaad' },
-    { sessionId: 'OMO-2026-002', dealerId: 'D001', tier: 'Tier1', bidAmount: 400000, status: 'Allocated', allocatedAmount: 400000, wallet: 'Both' },
-    { sessionId: 'OMO-2026-002', dealerId: 'D004', tier: 'Tier1', bidAmount: 350000, status: 'Allocated', allocatedAmount: 350000, wallet: 'Both' },
-    { sessionId: 'OMO-2026-003', dealerId: 'D001', tier: 'Tier1', bidAmount: 500000, status: 'Submitted', allocatedAmount: null, wallet: 'Both' },
-    { sessionId: 'OMO-2026-003', dealerId: 'D002', tier: 'Tier1', bidAmount: 480000, status: 'Submitted', allocatedAmount: null, wallet: 'Both' },
-    { sessionId: 'OMO-2026-003', dealerId: 'D005', tier: 'Tier2', bidAmount: 200000, status: 'Submitted', allocatedAmount: null, wallet: 'eDahab' },
-    { sessionId: 'OMO-2026-004', dealerId: 'D002', tier: 'Tier1', bidAmount: 300000, status: 'Submitted', allocatedAmount: null, wallet: 'Both' },
-    { sessionId: 'OMO-2026-004', dealerId: 'D003', tier: 'Tier1', bidAmount: 250000, status: 'Submitted', allocatedAmount: null, wallet: 'Zaad' },
+    { sessionId: 'OMO-2026-001', dealerId: 'D001', tier: 'Tier1', bidAmount: 450000, status: 'Allocated', allocatedAmount: 400000, walletChoice: 'Zaad'   },
+    { sessionId: 'OMO-2026-001', dealerId: 'D002', tier: 'Tier1', bidAmount: 500000, status: 'Allocated', allocatedAmount: 450000, walletChoice: 'Zaad'   },
+    { sessionId: 'OMO-2026-001', dealerId: 'D003', tier: 'Tier1', bidAmount: 300000, status: 'Allocated', allocatedAmount: 300000, walletChoice: 'Zaad'   },
+    { sessionId: 'OMO-2026-002', dealerId: 'D001', tier: 'Tier1', bidAmount: 400000, status: 'Allocated', allocatedAmount: 400000, walletChoice: 'Zaad'   },
+    { sessionId: 'OMO-2026-002', dealerId: 'D004', tier: 'Tier1', bidAmount: 350000, status: 'Allocated', allocatedAmount: 350000, walletChoice: 'eDahab' },
+    { sessionId: 'OMO-2026-003', dealerId: 'D001', tier: 'Tier1', bidAmount: 500000, status: 'Submitted', allocatedAmount: null,   walletChoice: 'Zaad'   },
+    { sessionId: 'OMO-2026-003', dealerId: 'D002', tier: 'Tier1', bidAmount: 480000, status: 'Submitted', allocatedAmount: null,   walletChoice: 'Zaad'   },
+    { sessionId: 'OMO-2026-003', dealerId: 'D005', tier: 'Tier2', bidAmount: 200000, status: 'Submitted', allocatedAmount: null,   walletChoice: 'eDahab' },
+    { sessionId: 'OMO-2026-004', dealerId: 'D002', tier: 'Tier1', bidAmount: 300000, status: 'Submitted', allocatedAmount: null,   walletChoice: 'Zaad'   },
+    { sessionId: 'OMO-2026-004', dealerId: 'D003', tier: 'Tier1', bidAmount: 250000, status: 'Submitted', allocatedAmount: null,   walletChoice: 'Zaad'   },
   ];
 
   for (const b of bids) {
@@ -187,12 +191,73 @@ async function main() {
           bidAmount: b.bidAmount,
           status: b.status as 'Submitted' | 'Allocated' | 'Partial' | 'Rejected',
           allocatedAmount: b.allocatedAmount,
+          walletChoice: b.walletChoice as 'Zaad' | 'eDahab',
         },
-        update: {},
+        update: { walletChoice: b.walletChoice as 'Zaad' | 'eDahab' },
       });
     } catch { /* skip duplicate */ }
   }
-  console.log('✅ OMO bids seeded');
+  console.log('✅ OMO bids seeded (with walletChoice)');
+
+  // ─── ALLOCATION RESULTS ────────────────────────────────────────────────────
+  // OMO-2026-001 (Injection, Allotment, SL 565): D001 $400K, D002 $450K, D003 $300K
+  // OMO-2026-002 (Absorption, Best Bid, SL 572): D001 $400K, D004 $350K
+  const allocationResults = [
+    { sessionId: 'OMO-2026-001', dealerId: 'D001', bidAmount: 450000, allocatedAmount: 400000, fixedRate: 565, slSettlement: 400000 * 565, settlementStatus: 'Completed' },
+    { sessionId: 'OMO-2026-001', dealerId: 'D002', bidAmount: 500000, allocatedAmount: 450000, fixedRate: 565, slSettlement: 450000 * 565, settlementStatus: 'Completed' },
+    { sessionId: 'OMO-2026-001', dealerId: 'D003', bidAmount: 300000, allocatedAmount: 300000, fixedRate: 565, slSettlement: 300000 * 565, settlementStatus: 'Completed' },
+    { sessionId: 'OMO-2026-002', dealerId: 'D001', bidAmount: 400000, allocatedAmount: 400000, fixedRate: 572, slSettlement: 400000 * 572, settlementStatus: 'Completed' },
+    { sessionId: 'OMO-2026-002', dealerId: 'D004', bidAmount: 350000, allocatedAmount: 350000, fixedRate: 572, slSettlement: 350000 * 572, settlementStatus: 'Completed' },
+  ];
+
+  for (const r of allocationResults) {
+    const exists = await prisma.allocationResult.findFirst({
+      where: { sessionId: r.sessionId, dealerId: r.dealerId },
+    });
+    if (!exists) {
+      await prisma.allocationResult.create({
+        data: {
+          sessionId: r.sessionId, dealerId: r.dealerId,
+          bidAmount: r.bidAmount, allocatedAmount: r.allocatedAmount,
+          fixedRate: r.fixedRate, slSettlement: r.slSettlement,
+          settlementStatus: r.settlementStatus as 'Pending' | 'Completed' | 'Failed',
+        },
+      });
+    }
+  }
+  console.log('✅ Allocation results seeded');
+
+  // ─── WALLET LEDGER ─────────────────────────────────────────────────────────
+  // Historical ledger entries reflecting the two completed OMO sessions
+  const walletLedgerEntries = [
+    // OMO-2026-001 Injection → dealers received USD (Credits)
+    { dealerId: 'D001', walletType: 'Zaad',   entryType: 'Credit', amountUSD: 400000, reference: 'OMO-2026-001', description: 'OMO Injection — Allotment allocation from session OMO-2026-001', balanceAfter: 250000 + 400000 },
+    { dealerId: 'D002', walletType: 'Zaad',   entryType: 'Credit', amountUSD: 450000, reference: 'OMO-2026-001', description: 'OMO Injection — Allotment allocation from session OMO-2026-001', balanceAfter: 200000 + 450000 },
+    { dealerId: 'D003', walletType: 'Zaad',   entryType: 'Credit', amountUSD: 300000, reference: 'OMO-2026-001', description: 'OMO Injection — Allotment allocation from session OMO-2026-001', balanceAfter: 180000 + 300000 },
+    // OMO-2026-002 Absorption → dealers sold USD back to CB (Debits)
+    { dealerId: 'D001', walletType: 'Zaad',   entryType: 'Debit',  amountUSD: 400000, reference: 'OMO-2026-002', description: 'OMO Absorption — Best Bid allocation from session OMO-2026-002', balanceAfter: 250000 },
+    { dealerId: 'D004', walletType: 'eDahab', entryType: 'Debit',  amountUSD: 350000, reference: 'OMO-2026-002', description: 'OMO Absorption — Best Bid allocation from session OMO-2026-002', balanceAfter: 400000 - 350000 },
+  ];
+
+  for (const entry of walletLedgerEntries) {
+    const exists = await prisma.walletLedger.findFirst({
+      where: { dealerId: entry.dealerId, reference: entry.reference },
+    });
+    if (!exists) {
+      await prisma.walletLedger.create({
+        data: {
+          dealerId: entry.dealerId,
+          walletType: entry.walletType as 'Zaad' | 'eDahab',
+          entryType: entry.entryType,
+          amountUSD: entry.amountUSD,
+          reference: entry.reference,
+          description: entry.description,
+          balanceAfter: entry.balanceAfter,
+        },
+      });
+    }
+  }
+  console.log('✅ Wallet ledger seeded');
 
   // ─── TRANSACTIONS ──────────────────────────────────────────────────────────
   const txData = [
@@ -235,6 +300,103 @@ async function main() {
     });
   }
   console.log('✅ Transactions seeded (TX001–TX015)');
+
+  // ─── RECENT TRANSACTIONS (Last 7 days for dashboard charts) ──────────────
+  const recentTxData = [
+    // 2026-04-01 (Tuesday) — 9 transactions
+    { id: 'TX016', refNumber: 'FX-20260401-00016', type: 'BuyUSD',  dealerId: 'D001', customerWallet: '063-1100-001', mobileNumber: '063-1100-001', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 1500,  rate: 572, status: 'Completed', timestamp: '2026-04-01T08:10:00Z' },
+    { id: 'TX017', refNumber: 'FX-20260401-00017', type: 'SellUSD', dealerId: 'D002', customerWallet: '770-2200-002', mobileNumber: '068-2200-002', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 2200,  rate: 567, status: 'Completed', timestamp: '2026-04-01T09:30:00Z' },
+    { id: 'TX018', refNumber: 'FX-20260401-00018', type: 'BuyUSD',  dealerId: 'D003', customerWallet: '063-3300-003', mobileNumber: '063-3300-003', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 4800,  rate: 572, status: 'Completed', timestamp: '2026-04-01T10:45:00Z' },
+    { id: 'TX019', refNumber: 'FX-20260401-00019', type: 'SellUSD', dealerId: 'D001', customerWallet: '770-4400-004', mobileNumber: '068-4400-004', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 1100,  rate: 567, status: 'Completed', timestamp: '2026-04-01T11:20:00Z' },
+    { id: 'TX020', refNumber: 'FX-20260401-00020', type: 'BuyUSD',  dealerId: 'D004', customerWallet: '063-5500-005', mobileNumber: '063-5500-005', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 7200,  rate: 572, status: 'Completed', timestamp: '2026-04-01T12:05:00Z' },
+    { id: 'TX021', refNumber: 'FX-20260401-00021', type: 'BuyUSD',  dealerId: 'D002', customerWallet: '063-6600-006', mobileNumber: '063-6600-006', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 3400,  rate: 572, status: 'Completed', timestamp: '2026-04-01T13:15:00Z' },
+    { id: 'TX022', refNumber: 'FX-20260401-00022', type: 'SellUSD', dealerId: 'D005', customerWallet: '770-7700-007', mobileNumber: '068-7700-007', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 5600,  rate: 567, status: 'Completed', timestamp: '2026-04-01T14:30:00Z' },
+    { id: 'TX023', refNumber: 'FX-20260401-00023', type: 'BuyUSD',  dealerId: 'D001', customerWallet: '063-8800-008', mobileNumber: '063-8800-008', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 900,   rate: 572, status: 'Pending',   timestamp: '2026-04-01T15:45:00Z' },
+    { id: 'TX024', refNumber: 'FX-20260401-00024', type: 'SellUSD', dealerId: 'D003', customerWallet: '770-9900-009', mobileNumber: '068-9900-009', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 2800,  rate: 567, status: 'Completed', timestamp: '2026-04-01T16:50:00Z' },
+    // 2026-04-02 (Wednesday) — 9 transactions
+    { id: 'TX025', refNumber: 'FX-20260402-00025', type: 'BuyUSD',  dealerId: 'D002', customerWallet: '063-1111-010', mobileNumber: '063-1111-010', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 6500,  rate: 572, status: 'Completed', timestamp: '2026-04-02T08:05:00Z' },
+    { id: 'TX026', refNumber: 'FX-20260402-00026', type: 'SellUSD', dealerId: 'D004', customerWallet: '770-2222-011', mobileNumber: '068-2222-011', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 3100,  rate: 567, status: 'Completed', timestamp: '2026-04-02T09:20:00Z' },
+    { id: 'TX027', refNumber: 'FX-20260402-00027', type: 'BuyUSD',  dealerId: 'D001', customerWallet: '063-3333-012', mobileNumber: '063-3333-012', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 2700,  rate: 572, status: 'Completed', timestamp: '2026-04-02T10:35:00Z' },
+    { id: 'TX028', refNumber: 'FX-20260402-00028', type: 'BuyUSD',  dealerId: 'D003', customerWallet: '063-4444-013', mobileNumber: '063-4444-013', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 8000,  rate: 572, status: 'Completed', timestamp: '2026-04-02T11:50:00Z' },
+    { id: 'TX029', refNumber: 'FX-20260402-00029', type: 'SellUSD', dealerId: 'D002', customerWallet: '770-5555-014', mobileNumber: '068-5555-014', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 4200,  rate: 567, status: 'Completed', timestamp: '2026-04-02T12:40:00Z' },
+    { id: 'TX030', refNumber: 'FX-20260402-00030', type: 'BuyUSD',  dealerId: 'D005', customerWallet: '063-6666-015', mobileNumber: '063-6666-015', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 500,   rate: 572, status: 'Completed', timestamp: '2026-04-02T13:55:00Z' },
+    { id: 'TX031', refNumber: 'FX-20260402-00031', type: 'SellUSD', dealerId: 'D001', customerWallet: '770-7777-016', mobileNumber: '068-7777-016', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 1900,  rate: 567, status: 'Failed',    timestamp: '2026-04-02T14:30:00Z' },
+    { id: 'TX032', refNumber: 'FX-20260402-00032', type: 'BuyUSD',  dealerId: 'D004', customerWallet: '063-8888-017', mobileNumber: '063-8888-017', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 3900,  rate: 572, status: 'Completed', timestamp: '2026-04-02T15:45:00Z' },
+    { id: 'TX033', refNumber: 'FX-20260402-00033', type: 'SellUSD', dealerId: 'D003', customerWallet: '770-9999-018', mobileNumber: '068-9999-018', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 7500,  rate: 567, status: 'Completed', timestamp: '2026-04-02T16:55:00Z' },
+    // 2026-04-03 (Thursday) — 9 transactions
+    { id: 'TX034', refNumber: 'FX-20260403-00034', type: 'BuyUSD',  dealerId: 'D001', customerWallet: '063-1010-019', mobileNumber: '063-1010-019', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 4100,  rate: 572, status: 'Completed', timestamp: '2026-04-03T08:15:00Z' },
+    { id: 'TX035', refNumber: 'FX-20260403-00035', type: 'SellUSD', dealerId: 'D002', customerWallet: '770-2020-020', mobileNumber: '068-2020-020', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 2600,  rate: 567, status: 'Completed', timestamp: '2026-04-03T09:25:00Z' },
+    { id: 'TX036', refNumber: 'FX-20260403-00036', type: 'BuyUSD',  dealerId: 'D003', customerWallet: '063-3030-021', mobileNumber: '063-3030-021', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 6800,  rate: 572, status: 'Completed', timestamp: '2026-04-03T10:40:00Z' },
+    { id: 'TX037', refNumber: 'FX-20260403-00037', type: 'BuyUSD',  dealerId: 'D004', customerWallet: '063-4040-022', mobileNumber: '063-4040-022', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 1300,  rate: 572, status: 'Completed', timestamp: '2026-04-03T11:55:00Z' },
+    { id: 'TX038', refNumber: 'FX-20260403-00038', type: 'SellUSD', dealerId: 'D005', customerWallet: '770-5050-023', mobileNumber: '068-5050-023', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 3700,  rate: 567, status: 'Completed', timestamp: '2026-04-03T12:50:00Z' },
+    { id: 'TX039', refNumber: 'FX-20260403-00039', type: 'BuyUSD',  dealerId: 'D002', customerWallet: '063-6060-024', mobileNumber: '063-6060-024', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 5200,  rate: 572, status: 'Completed', timestamp: '2026-04-03T13:45:00Z' },
+    { id: 'TX040', refNumber: 'FX-20260403-00040', type: 'SellUSD', dealerId: 'D001', customerWallet: '770-7070-025', mobileNumber: '068-7070-025', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 800,   rate: 567, status: 'Pending',   timestamp: '2026-04-03T14:30:00Z' },
+    { id: 'TX041', refNumber: 'FX-20260403-00041', type: 'BuyUSD',  dealerId: 'D003', customerWallet: '063-8080-026', mobileNumber: '063-8080-026', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 9200,  rate: 572, status: 'Completed', timestamp: '2026-04-03T15:50:00Z' },
+    { id: 'TX042', refNumber: 'FX-20260403-00042', type: 'SellUSD', dealerId: 'D004', customerWallet: '770-9090-027', mobileNumber: '068-9090-027', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 2100,  rate: 567, status: 'Completed', timestamp: '2026-04-03T16:40:00Z' },
+    // 2026-04-04 (Friday) — 9 transactions
+    { id: 'TX043', refNumber: 'FX-20260404-00043', type: 'BuyUSD',  dealerId: 'D001', customerWallet: '063-1122-028', mobileNumber: '063-1122-028', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 3300,  rate: 572, status: 'Completed', timestamp: '2026-04-04T08:05:00Z' },
+    { id: 'TX044', refNumber: 'FX-20260404-00044', type: 'SellUSD', dealerId: 'D002', customerWallet: '770-2233-029', mobileNumber: '068-2233-029', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 4700,  rate: 567, status: 'Completed', timestamp: '2026-04-04T09:15:00Z' },
+    { id: 'TX045', refNumber: 'FX-20260404-00045', type: 'BuyUSD',  dealerId: 'D004', customerWallet: '063-3344-030', mobileNumber: '063-3344-030', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 7700,  rate: 572, status: 'Completed', timestamp: '2026-04-04T10:30:00Z' },
+    { id: 'TX046', refNumber: 'FX-20260404-00046', type: 'BuyUSD',  dealerId: 'D003', customerWallet: '063-4455-031', mobileNumber: '063-4455-031', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 1700,  rate: 572, status: 'Completed', timestamp: '2026-04-04T11:45:00Z' },
+    { id: 'TX047', refNumber: 'FX-20260404-00047', type: 'SellUSD', dealerId: 'D005', customerWallet: '770-5566-032', mobileNumber: '068-5566-032', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 2400,  rate: 567, status: 'Completed', timestamp: '2026-04-04T12:55:00Z' },
+    { id: 'TX048', refNumber: 'FX-20260404-00048', type: 'BuyUSD',  dealerId: 'D002', customerWallet: '063-6677-033', mobileNumber: '063-6677-033', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 6200,  rate: 572, status: 'Completed', timestamp: '2026-04-04T13:50:00Z' },
+    { id: 'TX049', refNumber: 'FX-20260404-00049', type: 'SellUSD', dealerId: 'D001', customerWallet: '770-7788-034', mobileNumber: '068-7788-034', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 3800,  rate: 567, status: 'Completed', timestamp: '2026-04-04T14:40:00Z' },
+    { id: 'TX050', refNumber: 'FX-20260404-00050', type: 'BuyUSD',  dealerId: 'D004', customerWallet: '063-8899-035', mobileNumber: '063-8899-035', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 5100,  rate: 572, status: 'Pending',   timestamp: '2026-04-04T15:30:00Z' },
+    { id: 'TX051', refNumber: 'FX-20260404-00051', type: 'SellUSD', dealerId: 'D003', customerWallet: '770-9900-036', mobileNumber: '068-9900-036', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 1600,  rate: 567, status: 'Completed', timestamp: '2026-04-04T16:25:00Z' },
+    // 2026-04-05 (Saturday) — 8 transactions
+    { id: 'TX052', refNumber: 'FX-20260405-00052', type: 'BuyUSD',  dealerId: 'D002', customerWallet: '063-1212-037', mobileNumber: '063-1212-037', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 2900,  rate: 572, status: 'Completed', timestamp: '2026-04-05T08:30:00Z' },
+    { id: 'TX053', refNumber: 'FX-20260405-00053', type: 'SellUSD', dealerId: 'D001', customerWallet: '770-2323-038', mobileNumber: '068-2323-038', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 4400,  rate: 567, status: 'Completed', timestamp: '2026-04-05T09:50:00Z' },
+    { id: 'TX054', refNumber: 'FX-20260405-00054', type: 'BuyUSD',  dealerId: 'D003', customerWallet: '063-3434-039', mobileNumber: '063-3434-039', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 7100,  rate: 572, status: 'Completed', timestamp: '2026-04-05T11:00:00Z' },
+    { id: 'TX055', refNumber: 'FX-20260405-00055', type: 'BuyUSD',  dealerId: 'D005', customerWallet: '063-4545-040', mobileNumber: '063-4545-040', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 600,   rate: 572, status: 'Completed', timestamp: '2026-04-05T12:10:00Z' },
+    { id: 'TX056', refNumber: 'FX-20260405-00056', type: 'SellUSD', dealerId: 'D004', customerWallet: '770-5656-041', mobileNumber: '068-5656-041', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 3500,  rate: 567, status: 'Completed', timestamp: '2026-04-05T13:20:00Z' },
+    { id: 'TX057', refNumber: 'FX-20260405-00057', type: 'BuyUSD',  dealerId: 'D001', customerWallet: '063-6767-042', mobileNumber: '063-6767-042', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 5800,  rate: 572, status: 'Completed', timestamp: '2026-04-05T14:30:00Z' },
+    { id: 'TX058', refNumber: 'FX-20260405-00058', type: 'SellUSD', dealerId: 'D002', customerWallet: '770-7878-043', mobileNumber: '068-7878-043', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 2300,  rate: 567, status: 'Failed',    timestamp: '2026-04-05T15:15:00Z' },
+    { id: 'TX059', refNumber: 'FX-20260405-00059', type: 'BuyUSD',  dealerId: 'D003', customerWallet: '063-8989-044', mobileNumber: '063-8989-044', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 4600,  rate: 572, status: 'Completed', timestamp: '2026-04-05T16:40:00Z' },
+    // 2026-04-06 (Sunday) — 8 transactions
+    { id: 'TX060', refNumber: 'FX-20260406-00060', type: 'SellUSD', dealerId: 'D001', customerWallet: '770-1010-045', mobileNumber: '068-1010-045', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 1800,  rate: 567, status: 'Completed', timestamp: '2026-04-06T08:20:00Z' },
+    { id: 'TX061', refNumber: 'FX-20260406-00061', type: 'BuyUSD',  dealerId: 'D002', customerWallet: '063-2020-046', mobileNumber: '063-2020-046', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 3600,  rate: 572, status: 'Completed', timestamp: '2026-04-06T09:35:00Z' },
+    { id: 'TX062', refNumber: 'FX-20260406-00062', type: 'BuyUSD',  dealerId: 'D004', customerWallet: '063-3030-047', mobileNumber: '063-3030-047', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 6400,  rate: 572, status: 'Completed', timestamp: '2026-04-06T10:50:00Z' },
+    { id: 'TX063', refNumber: 'FX-20260406-00063', type: 'SellUSD', dealerId: 'D003', customerWallet: '770-4040-048', mobileNumber: '068-4040-048', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 2700,  rate: 567, status: 'Completed', timestamp: '2026-04-06T11:55:00Z' },
+    { id: 'TX064', refNumber: 'FX-20260406-00064', type: 'BuyUSD',  dealerId: 'D001', customerWallet: '063-5050-049', mobileNumber: '063-5050-049', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 8500,  rate: 572, status: 'Completed', timestamp: '2026-04-06T12:45:00Z' },
+    { id: 'TX065', refNumber: 'FX-20260406-00065', type: 'SellUSD', dealerId: 'D005', customerWallet: '770-6060-050', mobileNumber: '068-6060-050', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 4300,  rate: 567, status: 'Completed', timestamp: '2026-04-06T13:50:00Z' },
+    { id: 'TX066', refNumber: 'FX-20260406-00066', type: 'BuyUSD',  dealerId: 'D002', customerWallet: '063-7070-051', mobileNumber: '063-7070-051', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 1400,  rate: 572, status: 'Pending',   timestamp: '2026-04-06T14:55:00Z' },
+    { id: 'TX067', refNumber: 'FX-20260406-00067', type: 'SellUSD', dealerId: 'D004', customerWallet: '770-8080-052', mobileNumber: '068-8080-052', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 5300,  rate: 567, status: 'Completed', timestamp: '2026-04-06T16:00:00Z' },
+    // 2026-04-07 (Monday — today) — 11 transactions
+    { id: 'TX068', refNumber: 'FX-20260407-00068', type: 'BuyUSD',  dealerId: 'D001', customerWallet: '063-1001-053', mobileNumber: '063-1001-053', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 2500,  rate: 572, status: 'Completed', timestamp: '2026-04-07T07:15:00Z' },
+    { id: 'TX069', refNumber: 'FX-20260407-00069', type: 'SellUSD', dealerId: 'D002', customerWallet: '770-2002-054', mobileNumber: '068-2002-054', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 3900,  rate: 567, status: 'Completed', timestamp: '2026-04-07T08:00:00Z' },
+    { id: 'TX070', refNumber: 'FX-20260407-00070', type: 'BuyUSD',  dealerId: 'D003', customerWallet: '063-3003-055', mobileNumber: '063-3003-055', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 6100,  rate: 572, status: 'Completed', timestamp: '2026-04-07T08:45:00Z' },
+    { id: 'TX071', refNumber: 'FX-20260407-00071', type: 'BuyUSD',  dealerId: 'D004', customerWallet: '063-4004-056', mobileNumber: '063-4004-056', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 1200,  rate: 572, status: 'Completed', timestamp: '2026-04-07T09:20:00Z' },
+    { id: 'TX072', refNumber: 'FX-20260407-00072', type: 'SellUSD', dealerId: 'D001', customerWallet: '770-5005-057', mobileNumber: '068-5005-057', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 4800,  rate: 567, status: 'Completed', timestamp: '2026-04-07T09:55:00Z' },
+    { id: 'TX073', refNumber: 'FX-20260407-00073', type: 'BuyUSD',  dealerId: 'D002', customerWallet: '063-6006-058', mobileNumber: '063-6006-058', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 7800,  rate: 572, status: 'Completed', timestamp: '2026-04-07T10:30:00Z' },
+    { id: 'TX074', refNumber: 'FX-20260407-00074', type: 'SellUSD', dealerId: 'D005', customerWallet: '770-7007-059', mobileNumber: '068-7007-059', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 2200,  rate: 567, status: 'Completed', timestamp: '2026-04-07T11:00:00Z' },
+    { id: 'TX075', refNumber: 'FX-20260407-00075', type: 'BuyUSD',  dealerId: 'D003', customerWallet: '063-8008-060', mobileNumber: '063-8008-060', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 5500,  rate: 572, status: 'Completed', timestamp: '2026-04-07T11:35:00Z' },
+    { id: 'TX076', refNumber: 'FX-20260407-00076', type: 'SellUSD', dealerId: 'D004', customerWallet: '770-9009-061', mobileNumber: '068-9009-061', telcoOperator: 'Somtel',  walletType: 'eDahab', amountUSD: 3200,  rate: 567, status: 'Completed', timestamp: '2026-04-07T12:10:00Z' },
+    { id: 'TX077', refNumber: 'FX-20260407-00077', type: 'BuyUSD',  dealerId: 'D001', customerWallet: '063-1100-062', mobileNumber: '063-1100-062', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 9500,  rate: 572, status: 'Completed', timestamp: '2026-04-07T12:45:00Z' },
+    { id: 'TX078', refNumber: 'FX-20260407-00078', type: 'BuyUSD',  dealerId: 'D002', customerWallet: '063-2200-063', mobileNumber: '063-2200-063', telcoOperator: 'Telesom', walletType: 'Zaad',   amountUSD: 4100,  rate: 572, status: 'Pending',   timestamp: '2026-04-07T13:20:00Z' },
+  ];
+
+  for (const t of recentTxData) {
+    await prisma.transaction.upsert({
+      where: { refNumber: t.refNumber },
+      create: {
+        id: t.id, refNumber: t.refNumber,
+        type: t.type as 'BuyUSD' | 'SellUSD',
+        dealerId: t.dealerId,
+        customerWallet: t.customerWallet,
+        mobileNumber: t.mobileNumber,
+        telcoOperator: t.telcoOperator as 'Telesom' | 'Somtel' | 'Soltelco',
+        walletType: t.walletType as 'Zaad' | 'eDahab',
+        amountUSD: t.amountUSD,
+        amountSL: t.amountUSD * t.rate,
+        rate: t.rate,
+        status: t.status as 'Completed' | 'Pending' | 'Failed' | 'Cancelled',
+        source: 'seed',
+        timestamp: new Date(t.timestamp),
+      },
+      update: {},
+    });
+  }
+  console.log(`✅ Recent transactions seeded (TX016–TX0${15 + recentTxData.length})`);
 
   // ─── AML ALERTS ────────────────────────────────────────────────────────────
   const alerts = [

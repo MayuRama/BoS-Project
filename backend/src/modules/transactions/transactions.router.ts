@@ -3,7 +3,7 @@ import { z } from 'zod';
 import prisma from '../../config/database';
 import { verifyJWT, optionalJWT } from '../../middleware/auth';
 import { getPageParams, paginate, generateRefNumber, generateAlertCode } from '../../utils/helpers';
-import { runAMLChecks } from '../../utils/amlRules';
+import { runAMLChecks, AMLThresholds } from '../../utils/amlRules';
 import { emitTransactionNew, emitAMLAlert } from '../../socket/socket';
 
 const router = Router();
@@ -120,30 +120,61 @@ router.post('/', verifyJWT, async (req: Request, res: Response, next: NextFuncti
       include: { dealer: { select: { id: true, name: true } } },
     });
 
-    // Run AML checks
+    // Run AML checks — gather recent activity
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const oneDayAgo  = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const [recentCount, recentAmounts] = await Promise.all([
-      prisma.transaction.count({
+    const [recentMobileTxs, recentWalletTxs, amlSettings] = await Promise.all([
+      prisma.transaction.findMany({
         where: { mobileNumber: data.mobileNumber, timestamp: { gte: oneHourAgo }, id: { not: tx.id } },
+        select: { id: true, amountUSD: true },
       }),
       prisma.transaction.findMany({
         where: { customerWallet: data.customerWallet, timestamp: { gte: oneDayAgo }, id: { not: tx.id } },
-        select: { amountUSD: true },
+        select: { id: true, amountUSD: true },
+      }),
+      prisma.systemSetting.findMany({
+        where: { key: { in: ['aml_threshold', 'velocity_limit', 'structuring_count'] } },
       }),
     ]);
+
+    const settingsMap = Object.fromEntries(amlSettings.map(s => [s.key, Number(s.value)]));
+    const thresholds: AMLThresholds = {
+      amlThreshold:    settingsMap['aml_threshold']    ?? 50000,
+      velocityLimit:   settingsMap['velocity_limit']   ?? 5,
+      structuringCount: settingsMap['structuring_count'] ?? 5,
+    };
 
     const amlTrigger = runAMLChecks({
       amountUSD: data.amountUSD,
       mobileNumber: data.mobileNumber,
       customerWallet: data.customerWallet,
       dealerId: data.dealerId,
-      recentTxCount: recentCount,
-      recentTxAmounts: recentAmounts.map(t => Number(t.amountUSD)),
-    });
+      recentTxCount: recentMobileTxs.length,
+      recentTxAmounts: recentWalletTxs.map(t => Number(t.amountUSD)),
+    }, thresholds);
 
+    let finalTx = tx;
     if (amlTrigger?.triggered) {
+      // Hold the flagged transaction in Pending
+      finalTx = await prisma.transaction.update({
+        where: { id: tx.id },
+        data: { status: 'Pending' },
+        include: { dealer: { select: { id: true, name: true } } },
+      });
+
+      // Collect all triggering transaction IDs
+      let triggeringIds: string[] = [tx.id];
+      if (amlTrigger.type === 'VelocityCheck' || amlTrigger.type === 'UnusualFrequency') {
+        triggeringIds = [tx.id, ...recentMobileTxs.map(t => t.id)];
+      } else if (amlTrigger.type === 'StructuringPattern') {
+        const structuring = recentWalletTxs.filter(
+          t => Number(t.amountUSD) >= 8000 && Number(t.amountUSD) <= 10000
+        );
+        triggeringIds = [tx.id, ...structuring.map(t => t.id)];
+      }
+      triggeringIds = [...new Set(triggeringIds)];
+
       const alert = await prisma.aMLAlert.create({
         data: {
           alertCode: generateAlertCode(),
@@ -155,14 +186,14 @@ router.post('/', verifyJWT, async (req: Request, res: Response, next: NextFuncti
           triggerRule: amlTrigger.triggerRule,
           priority: amlTrigger.priority,
           status: 'New',
-          transactions: { create: { transactionId: tx.id } },
+          transactions: { create: triggeringIds.map(transactionId => ({ transactionId })) },
         },
       });
       emitAMLAlert(alert);
     }
 
-    emitTransactionNew(tx);
-    res.status(201).json(tx);
+    emitTransactionNew(finalTx);
+    res.status(201).json(finalTx);
   } catch (err) { next(err); }
 });
 
