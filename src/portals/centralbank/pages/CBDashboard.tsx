@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -8,53 +8,163 @@ import {
 } from 'lucide-react';
 import KPICard from '../../../components/ui/KPICard';
 import StatusBadge from '../../../components/ui/StatusBadge';
-import {
-  transactions, volumeLast7Days, dealerActivity, transactionTypeSplit, omoSessions, telcoSplit,
-} from '../../../data/mockData';
+import { api } from '../../../api/client';
 
 const PIE_COLORS = ['#6ab04c', '#1e40af'];
 
 const fmtUSD = (n: number) => `$${n.toLocaleString()}`;
 
-const telesomVolume = transactions.filter(t => t.telcoOperator === 'Telesom').reduce((s, t) => s + t.amountUSD, 0);
-const somtelVolume  = transactions.filter(t => t.telcoOperator === 'Somtel').reduce((s, t) => s + t.amountUSD, 0);
+// ── Inline Types ──────────────────────────────────────────────────────────────
+
+interface DashboardKPIs {
+  totalVolumeToday: number;
+  telesomVolumeToday: number;
+  somtelVolumeToday: number;
+  zaadSettlements: number;
+  edahabSettlements: number;
+  activeOMOSessions: number;
+  activeDealers: number;
+  pendingAMLAlerts: number;
+  totalTxToday: number;
+  telesomTxCount: number;
+  somtelTxCount: number;
+  telesomPct: number;
+  somtelPct: number;
+}
+
+interface DashboardStats {
+  kpis: DashboardKPIs;
+  volumeLast7Days: { day: string; telesom: number; somtel: number; total: number }[];
+  transactionTypeSplit: { name: string; value: number }[];
+  telcoSplit: { name: string; value: number }[];
+  topDealers: { name: string; volume: number }[];
+  recentTransactions: {
+    id: string; refNumber: string; type: string; mobileNumber: string;
+    telcoOperator: string; amountUSD: number; amountSL: number; rate: number;
+    dealerName: string; status: string; timestamp: string;
+  }[];
+  activeSessions: {
+    id: string; type: string; fixedRate: number; totalAmount: number;
+    status: string; bidsCount: number; totalBidAmount: number;
+    startTime: string; durationMinutes: number;
+  }[];
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 const CBDashboard: React.FC = () => {
-  const activeSessions = omoSessions.filter(s => s.status === 'Open' || s.status === 'Pending Allocation');
-  const recentTx = transactions.slice(0, 10);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const data = await api.get<DashboardStats>('/dashboard/stats');
+      setStats(data);
+    } catch (err) {
+      console.error('Dashboard stats fetch failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+    const interval = setInterval(fetchStats, 15000);
+    return () => clearInterval(interval);
+  }, [fetchStats]);
+
+  if (loading && !stats) {
+    return (
+      <div className="p-6 flex items-center justify-center h-64">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-bos-blue border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-gray-500">Loading dashboard…</p>
+        </div>
+      </div>
+    );
+  }
+
+  const kpis = stats?.kpis;
+  const today = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
     <div className="p-6 space-y-6">
       {/* Page title */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Real-time FX market overview — 15 March 2024</p>
+        <p className="text-sm text-gray-500 mt-0.5">Real-time FX market overview — {today}</p>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <KPICard title="Total FX Volume Today" value="$4,280,000" icon={DollarSign}
-          iconColor="text-green-600" iconBg="bg-green-50" trend={{ value: '+8.2% vs yesterday', up: true }} />
-        <KPICard title="Active OMO Sessions" value="2" icon={Activity}
-          iconColor="text-blue-600" iconBg="bg-blue-50" subtitle="1 Open · 1 Pending Allocation" />
-        <KPICard title="Active Dealers" value="14" icon={Users}
-          iconColor="text-purple-600" iconBg="bg-purple-50" subtitle="5 Tier 1 · 9 Tier 2" />
-        <KPICard title="Pending AML Alerts" value="3" icon={AlertTriangle}
-          iconColor="text-red-600" iconBg="bg-red-50" trend={{ value: '+1 since yesterday', up: false }} />
+        <KPICard
+          title="Total FX Volume Today"
+          value={kpis ? fmtUSD(kpis.totalVolumeToday) : '—'}
+          icon={DollarSign}
+          iconColor="text-green-600"
+          iconBg="bg-green-50"
+          subtitle={kpis ? `${kpis.totalTxToday} transactions today` : undefined}
+        />
+        <KPICard
+          title="Active OMO Sessions"
+          value={kpis ? String(kpis.activeOMOSessions) : '—'}
+          icon={Activity}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50"
+          subtitle={kpis ? `${kpis.activeOMOSessions} Open` : undefined}
+        />
+        <KPICard
+          title="Active Dealers"
+          value={kpis ? String(kpis.activeDealers) : '—'}
+          icon={Users}
+          iconColor="text-purple-600"
+          iconBg="bg-purple-50"
+          subtitle="Licensed FX dealers"
+        />
+        <KPICard
+          title="Pending AML Alerts"
+          value={kpis ? String(kpis.pendingAMLAlerts) : '—'}
+          icon={AlertTriangle}
+          iconColor="text-red-600"
+          iconBg="bg-red-50"
+          subtitle="New + Under Review"
+        />
       </div>
 
       {/* Telco / Wallet KPIs */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <KPICard title="Telesom (Zaad) Volume" value={fmtUSD(telesomVolume)} icon={Smartphone}
-          iconColor="text-emerald-600" iconBg="bg-emerald-50"
-          subtitle={`${telcoSplit[0].value}% of total · ${transactions.filter(t => t.telcoOperator === 'Telesom').length} txns`} />
-        <KPICard title="Somtel (e-Dahab) Volume" value={fmtUSD(somtelVolume)} icon={Wifi}
-          iconColor="text-blue-600" iconBg="bg-blue-50"
-          subtitle={`${telcoSplit[1].value}% of total · ${transactions.filter(t => t.telcoOperator === 'Somtel').length} txns`} />
-        <KPICard title="Zaad Settlements" value="312" icon={Smartphone}
-          iconColor="text-green-600" iconBg="bg-green-50" subtitle="8 failed · 12 pending" />
-        <KPICard title="e-Dahab Settlements" value="238" icon={Wifi}
-          iconColor="text-purple-600" iconBg="bg-purple-50" subtitle="6 failed · 9 pending" />
+        <KPICard
+          title="Telesom (Zaad) Volume"
+          value={kpis ? fmtUSD(kpis.telesomVolumeToday) : '—'}
+          icon={Smartphone}
+          iconColor="text-emerald-600"
+          iconBg="bg-emerald-50"
+          subtitle={kpis ? `${kpis.telesomPct}% of total · ${kpis.telesomTxCount} txns` : undefined}
+        />
+        <KPICard
+          title="Somtel (e-Dahab) Volume"
+          value={kpis ? fmtUSD(kpis.somtelVolumeToday) : '—'}
+          icon={Wifi}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50"
+          subtitle={kpis ? `${kpis.somtelPct}% of total · ${kpis.somtelTxCount} txns` : undefined}
+        />
+        <KPICard
+          title="Zaad Settlements"
+          value={kpis ? String(kpis.zaadSettlements) : '—'}
+          icon={Smartphone}
+          iconColor="text-green-600"
+          iconBg="bg-green-50"
+          subtitle="Today"
+        />
+        <KPICard
+          title="e-Dahab Settlements"
+          value={kpis ? String(kpis.edahabSettlements) : '—'}
+          icon={Wifi}
+          iconColor="text-purple-600"
+          iconBg="bg-purple-50"
+          subtitle="Today"
+        />
       </div>
 
       {/* Rate Banner */}
@@ -88,16 +198,18 @@ const CBDashboard: React.FC = () => {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Line chart */}
+        {/* Bar chart — last 7 days by telco */}
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-sm font-semibold text-gray-800 mb-4">Transaction Volume — Last 7 Days</h2>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={volumeLast7Days}>
+            <LineChart data={stats?.volumeLast7Days ?? []}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="day" tick={{ fontSize: 11 }} tickFormatter={d => d.split(' ')[0]} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 1000000).toFixed(1)}M`} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}K`} />
               <Tooltip formatter={(v: number) => fmtUSD(v)} />
-              <Line type="monotone" dataKey="volume" stroke="#6ab04c" strokeWidth={2} dot={{ r: 4, fill: '#6ab04c' }} />
+              <Legend />
+              <Line type="monotone" dataKey="telesom" name="Telesom" stroke="#6ab04c" strokeWidth={2} dot={{ r: 3, fill: '#6ab04c' }} />
+              <Line type="monotone" dataKey="somtel" name="Somtel" stroke="#1e40af" strokeWidth={2} dot={{ r: 3, fill: '#1e40af' }} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -107,8 +219,16 @@ const CBDashboard: React.FC = () => {
           <h2 className="text-sm font-semibold text-gray-800 mb-4">Transaction Type Split</h2>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
-              <Pie data={transactionTypeSplit} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({ name, value }) => `${name} ${value}%`} labelLine={false}>
-                {transactionTypeSplit.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+              <Pie
+                data={stats?.transactionTypeSplit ?? []}
+                cx="50%" cy="50%" outerRadius={70}
+                dataKey="value"
+                label={({ name, value }: { name: string; value: number }) => `${name} ${value}%`}
+                labelLine={false}
+              >
+                {(stats?.transactionTypeSplit ?? []).map((_, i) => (
+                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                ))}
               </Pie>
               <Legend />
               <Tooltip formatter={(v: number) => `${v}%`} />
@@ -119,9 +239,9 @@ const CBDashboard: React.FC = () => {
 
       {/* Dealer Activity bar chart */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-        <h2 className="text-sm font-semibold text-gray-800 mb-4">Top 5 Dealers by Volume</h2>
+        <h2 className="text-sm font-semibold text-gray-800 mb-4">Top 5 Dealers by Volume (30 days)</h2>
         <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={dealerActivity} barSize={36}>
+          <BarChart data={stats?.topDealers ?? []} barSize={36}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
             <XAxis dataKey="name" tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}K`} />
@@ -146,9 +266,9 @@ const CBDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {recentTx.map(tx => (
+                {(stats?.recentTransactions ?? []).map(tx => (
                   <tr key={tx.id} className="hover:bg-gray-50">
-                    <td className="py-2 pr-3 font-mono text-gray-600">{tx.refNumber.replace('FX-2024-', '')}</td>
+                    <td className="py-2 pr-3 font-mono text-gray-600">{tx.refNumber.replace(/FX-\d{8}-/, '')}</td>
                     <td className="py-2 pr-3"><StatusBadge status={tx.type} /></td>
                     <td className="py-2 pr-3 font-mono font-semibold text-gray-800">{tx.mobileNumber}</td>
                     <td className="py-2 pr-3">
@@ -166,6 +286,9 @@ const CBDashboard: React.FC = () => {
               </tbody>
             </table>
           </div>
+          {(stats?.recentTransactions ?? []).length === 0 && (
+            <p className="text-center text-gray-400 text-sm py-8">No transactions</p>
+          )}
         </div>
 
         {/* Active OMO Sessions */}
@@ -181,23 +304,20 @@ const CBDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {activeSessions.map(s => {
-                  const totalBids = s.bids.reduce((a, b) => a + b.bidAmount, 0);
-                  return (
-                    <tr key={s.id} className="hover:bg-gray-50">
-                      <td className="py-2.5 pr-3 font-mono text-blue-600 font-medium">{s.id}</td>
-                      <td className="py-2.5 pr-3"><StatusBadge status={s.type} /></td>
-                      <td className="py-2.5 pr-3">SL {s.fixedRate.toLocaleString()}</td>
-                      <td className="py-2.5 pr-3">{fmtUSD(s.totalAmount)}</td>
-                      <td className="py-2.5 pr-3">{s.bids.length} ({fmtUSD(totalBids)})</td>
-                      <td className="py-2.5 pr-3"><StatusBadge status={s.status} /></td>
-                    </tr>
-                  );
-                })}
+                {(stats?.activeSessions ?? []).map(s => (
+                  <tr key={s.id} className="hover:bg-gray-50">
+                    <td className="py-2.5 pr-3 font-mono text-blue-600 font-medium">{s.id}</td>
+                    <td className="py-2.5 pr-3"><StatusBadge status={s.type} /></td>
+                    <td className="py-2.5 pr-3">SL {s.fixedRate.toLocaleString()}</td>
+                    <td className="py-2.5 pr-3">{fmtUSD(s.totalAmount)}</td>
+                    <td className="py-2.5 pr-3">{s.bidsCount} ({fmtUSD(s.totalBidAmount)})</td>
+                    <td className="py-2.5 pr-3"><StatusBadge status={s.status} /></td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-          {activeSessions.length === 0 && (
+          {(stats?.activeSessions ?? []).length === 0 && (
             <p className="text-center text-gray-400 text-sm py-8">No active sessions</p>
           )}
         </div>

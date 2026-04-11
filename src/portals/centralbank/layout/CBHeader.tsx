@@ -1,5 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Bell, LogOut, User, ChevronDown } from 'lucide-react';
 
 interface CBHeaderProps {
@@ -7,12 +6,12 @@ interface CBHeaderProps {
 }
 
 const CBHeader: React.FC<CBHeaderProps> = ({ role }) => {
-  const navigate = useNavigate();
-
   const handleLogout = () => {
     localStorage.removeItem('cb_logged_in');
     localStorage.removeItem('cb_role');
-    navigate('/centralbank-portal/login');
+    localStorage.removeItem('cb_username');
+    localStorage.removeItem('cb_api_token');
+    window.location.replace('/centralbank-portal/login');
   };
 
   return (

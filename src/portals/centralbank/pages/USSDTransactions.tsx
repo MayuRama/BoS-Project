@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Search, Filter, Download, Smartphone, Wifi } from 'lucide-react';
+import { Search, Filter, Download, Smartphone, Wifi, RefreshCw } from 'lucide-react';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import KPICard from '../../../components/ui/KPICard';
 import Modal from '../../../components/ui/Modal';
 import { DollarSign, Activity } from 'lucide-react';
-import { transactions, telcoVolumeData, telcoSplit } from '../../../data/mockData';
+import { telcoVolumeData, telcoSplit } from '../../../data/mockData';
+import { api } from '../../../api/client';
 import type { Transaction } from '../../../types';
 
 const TELCO_COLORS: Record<string, string> = {
@@ -30,8 +31,39 @@ const USSDTransactions: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('All');
   const [page, setPage]                 = useState(1);
   const [selected, setSelected]         = useState<Transaction | null>(null);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  const filtered = transactions.filter(tx => {
+  const fetchTransactions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<{ data: unknown[] }>('/transactions?limit=500');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setAllTransactions(res.data.map((t: any) => ({
+        ...t,
+        amountUSD: Number(t.amountUSD),   // Prisma Decimal → string from API, must convert
+        amountSL:  Number(t.amountSL),
+        rate:      Number(t.rate),
+        type: t.type === 'BuyUSD' ? 'Buy USD' : 'Sell USD',
+        walletType: t.walletType === 'eDahab' ? 'e-Dahab' : t.walletType,
+        dealerName: t.dealer?.name ?? t.dealerName ?? '',
+      })) as Transaction[]);
+      setLastRefresh(new Date());
+    } catch {
+      // backend unavailable — keep existing data
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTransactions();
+    const interval = setInterval(fetchTransactions, 10000);
+    return () => clearInterval(interval);
+  }, [fetchTransactions]);
+
+  const filtered = allTransactions.filter(tx => {
     const matchSearch =
       !search ||
       tx.mobileNumber.includes(search) ||
@@ -55,11 +87,21 @@ const USSDTransactions: React.FC = () => {
 
   return (
     <div className="p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">USSD Transaction Monitor</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          Real-time monitoring of all FX transactions processed through the USSD platform
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">USSD Transaction Monitor</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Real-time monitoring of all FX transactions processed through the USSD platform
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">Updated: {lastRefresh.toLocaleTimeString()}</span>
+          <button onClick={fetchTransactions} disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 shadow-sm">
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* KPI row */}

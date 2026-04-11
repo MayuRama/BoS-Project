@@ -1,0 +1,14 @@
+# gcloud uses this file instead of .gitignore when uploading source
+# dist is intentionally included (pre-built before deploy)
+
+.git
+.gitignore
+.gcloudignore
+.claude
+node_modules
+src
+public
+*.log
+.env
+.env.*
+*.local

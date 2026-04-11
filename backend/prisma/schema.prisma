@@ -1,0 +1,413 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum UserRole {
+  CBSuperAdmin
+  FXInterventionDesk
+  Supervisor
+  Auditor
+  DealerAdmin
+  DealerOperator
+}
+
+enum DealerTier {
+  Tier1
+  Tier2
+}
+
+enum DealerStatus {
+  Active
+  Suspended
+  Pending
+}
+
+enum WalletProvider {
+  Zaad
+  eDahab
+  Both
+}
+
+enum TelcoOperator {
+  Telesom
+  Somtel
+  Soltelco
+}
+
+enum WalletType {
+  Zaad
+  eDahab
+}
+
+enum TransactionType {
+  BuyUSD
+  SellUSD
+}
+
+enum TransactionStatus {
+  Completed
+  Pending
+  Failed
+  Cancelled
+}
+
+enum OMOSessionType {
+  Injection
+  Absorption
+}
+
+enum OMOSessionStatus {
+  Open
+  PendingAllocation
+  Completed
+  Cancelled
+}
+
+enum AllocationMethod {
+  EqualDistribution
+  BestBidPriceWins
+}
+
+enum BidStatus {
+  Submitted
+  Allocated
+  Partial
+  Rejected
+}
+
+enum SettlementStatus {
+  Pending
+  Completed
+  Failed
+}
+
+enum AlertType {
+  ThresholdExceeded
+  UnusualFrequency
+  StructuringPattern
+  VelocityCheck
+}
+
+enum AlertPriority {
+  High
+  Medium
+  Low
+}
+
+enum AlertStatus {
+  New
+  UnderReview
+  Resolved
+}
+
+enum NotificationType {
+  OMO
+  Transaction
+  System
+  Rate
+  Settlement
+}
+
+// ─── USERS ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  role         UserRole
+  isActive     Boolean   @default(true)
+  dealerId     String?
+  dealer       Dealer?   @relation(fields: [dealerId], references: [id])
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  auditLogs    AuditLog[]
+
+  @@index([email])
+  @@index([dealerId])
+}
+
+// ─── DEALERS ─────────────────────────────────────────────────────────────────
+
+model Dealer {
+  id              String         @id
+  name            String
+  licenseNumber   String         @unique
+  tier            DealerTier
+  buyRate         Decimal        @db.Decimal(10, 2)
+  sellRate        Decimal        @db.Decimal(10, 2)
+  dailyLimit      Decimal        @db.Decimal(15, 2)
+  status          DealerStatus   @default(Active)
+  walletProvider  WalletProvider
+  zaadWallet      String?
+  eDahabWallet    String?
+  registeredDate  DateTime
+  volume30d        Decimal        @db.Decimal(15, 2) @default(0)
+  txCount30d       Int            @default(0)
+  complianceScore  Int            @default(100)
+  zaadBalanceUSD   Decimal        @db.Decimal(15, 2) @default(0)
+  eDahabBalanceUSD Decimal        @db.Decimal(15, 2) @default(0)
+  contactEmail     String
+  contactPhone     String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  users             User[]
+  transactions      Transaction[]
+  bids              OMOBid[]
+  amlAlerts         AMLAlert[]
+  notifications     Notification[]
+  allocationResults AllocationResult[]
+  walletLedger      WalletLedger[]
+
+  @@index([status])
+  @@index([tier])
+}
+
+// ─── OMO SESSIONS ────────────────────────────────────────────────────────────
+
+model OMOSession {
+  id               String           @id
+  type             OMOSessionType
+  fixedRate        Decimal          @db.Decimal(10, 2)
+  totalAmount      Decimal          @db.Decimal(15, 2)
+  startTime        DateTime
+  durationMinutes  Int
+  status           OMOSessionStatus @default(Open)
+  allocationMethod AllocationMethod
+  maxBidTier1      Decimal          @db.Decimal(15, 2)
+  maxBidTier2      Decimal          @db.Decimal(15, 2)
+  closedAt         DateTime?
+  createdBy        String
+  notes            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  bids             OMOBid[]
+  allocationResults AllocationResult[]
+  notifications    Notification[]
+
+  @@index([status])
+  @@index([startTime])
+}
+
+// ─── OMO BIDS ────────────────────────────────────────────────────────────────
+
+model OMOBid {
+  id              String         @id @default(cuid())
+  sessionId       String
+  session         OMOSession     @relation(fields: [sessionId], references: [id])
+  dealerId        String
+  dealer          Dealer         @relation(fields: [dealerId], references: [id])
+  tier            DealerTier
+  bidAmount       Decimal        @db.Decimal(15, 2)
+  bidRate         Decimal?       @db.Decimal(10, 4)   // competitive rate submitted by dealer (BestBidPriceWins only)
+  walletChoice    WalletType?                         // wallet dealer wants allocation credited/debited to
+  allocatedAmount Decimal?       @db.Decimal(15, 2)
+  status          BidStatus      @default(Submitted)
+  submittedAt     DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([sessionId, dealerId])
+  @@index([sessionId])
+  @@index([dealerId])
+}
+
+// ─── ALLOCATION RESULTS ──────────────────────────────────────────────────────
+
+model AllocationResult {
+  id               String           @id @default(cuid())
+  sessionId        String
+  session          OMOSession       @relation(fields: [sessionId], references: [id])
+  dealerId         String
+  dealer           Dealer           @relation(fields: [dealerId], references: [id])
+  bidAmount        Decimal          @db.Decimal(15, 2)
+  allocatedAmount  Decimal          @db.Decimal(15, 2)
+  fixedRate        Decimal          @db.Decimal(10, 2)
+  slSettlement     Decimal          @db.Decimal(20, 2)
+  settlementStatus SettlementStatus @default(Pending)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([dealerId])
+  @@index([sessionId])
+}
+
+// ─── TRANSACTIONS ────────────────────────────────────────────────────────────
+
+model Transaction {
+  id             String            @id @default(cuid())
+  refNumber      String            @unique
+  type           TransactionType
+  dealerId       String
+  dealer         Dealer            @relation(fields: [dealerId], references: [id])
+  customerWallet String
+  mobileNumber   String
+  telcoOperator  TelcoOperator
+  walletType     WalletType
+  amountUSD      Decimal           @db.Decimal(15, 2)
+  amountSL       Decimal           @db.Decimal(20, 2)
+  rate           Decimal           @db.Decimal(10, 2)
+  status         TransactionStatus @default(Pending)
+  source         String            @default("portal")
+  timestamp      DateTime          @default(now())
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  amlAlerts      AMLAlertTransaction[]
+
+  @@index([dealerId])
+  @@index([timestamp])
+  @@index([status])
+  @@index([mobileNumber])
+  @@index([telcoOperator])
+}
+
+// ─── AML ALERTS ──────────────────────────────────────────────────────────────
+
+model AMLAlert {
+  id             String        @id @default(cuid())
+  alertCode      String        @unique
+  type           AlertType
+  dealerId       String
+  dealer         Dealer        @relation(fields: [dealerId], references: [id])
+  customerWallet String?
+  mobileNumber   String?
+  amount         Decimal       @db.Decimal(15, 2)
+  triggerRule    String
+  priority       AlertPriority
+  status         AlertStatus   @default(New)
+  resolvedBy     String?
+  resolvedAt     DateTime?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  transactions   AMLAlertTransaction[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([dealerId])
+}
+
+// ─── AML ALERT <-> TRANSACTION (many-to-many) ────────────────────────────────
+
+model AMLAlertTransaction {
+  alertId       String
+  alert         AMLAlert    @relation(fields: [alertId], references: [id])
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+
+  @@id([alertId, transactionId])
+}
+
+// ─── WALLET LEDGER ───────────────────────────────────────────────────────────
+
+model WalletLedger {
+  id           String     @id @default(cuid())
+  dealerId     String
+  dealer       Dealer     @relation(fields: [dealerId], references: [id])
+  walletType   WalletType
+  entryType    String     // 'Credit' | 'Debit'
+  amountUSD    Decimal    @db.Decimal(15, 2)
+  reference    String     // session ID or transaction ref
+  description  String
+  balanceAfter Decimal    @db.Decimal(15, 2)
+  createdAt    DateTime   @default(now())
+
+  @@index([dealerId])
+  @@index([createdAt])
+}
+
+// ─── RATE CONTROLS ───────────────────────────────────────────────────────────
+
+model RateControl {
+  id           String   @id @default(cuid())
+  buyFloor     Decimal  @db.Decimal(10, 2)
+  buyCeiling   Decimal  @db.Decimal(10, 2)
+  sellFloor    Decimal  @db.Decimal(10, 2)
+  sellCeiling  Decimal  @db.Decimal(10, 2)
+  maxSpreadPct Decimal  @db.Decimal(5, 2)
+  marketRef    Decimal  @db.Decimal(10, 2)
+  isActive     Boolean  @default(true)
+  updatedBy    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── RATE HISTORY ────────────────────────────────────────────────────────────
+
+model RateHistory {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  buyRate   Decimal  @db.Decimal(10, 2)
+  sellRate  Decimal  @db.Decimal(10, 2)
+  marketRef Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  @@unique([date])
+  @@index([date])
+}
+
+// ─── AUDIT LOGS ──────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  actorName String
+  role      String
+  action    String
+  entity    String
+  entityId  String?
+  details   String
+  ipAddress String
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([timestamp])
+  @@index([actorId])
+  @@index([entity])
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  priority  String           @default("Normal")
+  dealerId  String?
+  dealer    Dealer?          @relation(fields: [dealerId], references: [id])
+  sessionId String?
+  session   OMOSession?      @relation(fields: [sessionId], references: [id])
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([dealerId])
+  @@index([read])
+}
+
+// ─── SYSTEM SETTINGS ─────────────────────────────────────────────────────────
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  label     String
+  category  String
+  updatedBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

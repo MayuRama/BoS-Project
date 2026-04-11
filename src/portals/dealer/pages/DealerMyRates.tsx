@@ -1,6 +1,16 @@
-import React, { useState } from 'react';
-import { CheckCircle, AlertTriangle, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CheckCircle, AlertTriangle, TrendingUp, RefreshCw } from 'lucide-react';
 import { dealers } from '../../../data/mockData';
+import { api } from '../../../api/client';
+
+interface RateControl {
+  buyFloor: number;
+  buyCeiling: number;
+  sellFloor: number;
+  sellCeiling: number;
+  maxSpreadPct: number;
+  marketRef: number;
+}
 
 const DealerMyRates: React.FC = () => {
   const [buyRate, setBuyRate] = useState(567);
@@ -9,21 +19,52 @@ const DealerMyRates: React.FC = () => {
   const [newSell, setNewSell] = useState('');
   const [effective, setEffective] = useState('Immediately');
   const [saved, setSaved] = useState(false);
+  const [cbLimits, setCbLimits] = useState<RateControl>({
+    buyFloor: 558, buyCeiling: 575,
+    sellFloor: 560, sellCeiling: 580,
+    maxSpreadPct: 2.5, marketRef: 570,
+  });
+  const [limitsLoading, setLimitsLoading] = useState(true);
+
   const [history] = useState([
-    { date: '2024-03-14 16:30', prevBuy: 566, newBuy: 567, prevSell: 571, newSell: 572, by: 'Ahmed (ops)' },
-    { date: '2024-03-12 09:15', prevBuy: 565, newBuy: 566, prevSell: 570, newSell: 571, by: 'Ahmed (ops)' },
-    { date: '2024-03-10 11:00', prevBuy: 564, newBuy: 565, prevSell: 569, newSell: 570, by: 'Amina (admin)' },
-    { date: '2024-03-07 14:45', prevBuy: 563, newBuy: 564, prevSell: 568, newSell: 569, by: 'Ahmed (ops)' },
-    { date: '2024-03-05 08:30', prevBuy: 561, newBuy: 563, prevSell: 566, newSell: 568, by: 'Amina (admin)' },
+    { date: '2026-04-04 16:30', prevBuy: 566, newBuy: 567, prevSell: 571, newSell: 572, by: 'Ahmed (ops)' },
+    { date: '2026-04-02 09:15', prevBuy: 565, newBuy: 566, prevSell: 570, newSell: 571, by: 'Ahmed (ops)' },
+    { date: '2026-03-31 11:00', prevBuy: 564, newBuy: 565, prevSell: 569, newSell: 570, by: 'Amina (admin)' },
+    { date: '2026-03-28 14:45', prevBuy: 563, newBuy: 564, prevSell: 568, newSell: 569, by: 'Ahmed (ops)' },
+    { date: '2026-03-25 08:30', prevBuy: 561, newBuy: 563, prevSell: 566, newSell: 568, by: 'Amina (admin)' },
   ]);
 
-  const limits = { buyFloor: 558, buyCeiling: 575, sellFloor: 560, sellCeiling: 580 };
-  const marketRef = 570;
+  const fetchLimits = useCallback(async () => {
+    try {
+      const control = await api.get<RateControl | null>('/rates/controls');
+      if (control) {
+        setCbLimits({
+          buyFloor: Number(control.buyFloor),
+          buyCeiling: Number(control.buyCeiling),
+          sellFloor: Number(control.sellFloor),
+          sellCeiling: Number(control.sellCeiling),
+          maxSpreadPct: Number(control.maxSpreadPct),
+          marketRef: Number(control.marketRef),
+        });
+      }
+    } catch {
+      // keep defaults
+    } finally {
+      setLimitsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLimits();
+    // Poll CB limits every 15 seconds so dealer sees limit changes in real time
+    const interval = setInterval(fetchLimits, 15000);
+    return () => clearInterval(interval);
+  }, [fetchLimits]);
 
   const newBuyNum = Number(newBuy);
   const newSellNum = Number(newSell);
-  const buyOutBounds = newBuy && (newBuyNum < limits.buyFloor || newBuyNum > limits.buyCeiling);
-  const sellOutBounds = newSell && (newSellNum < limits.sellFloor || newSellNum > limits.sellCeiling);
+  const buyOutBounds = newBuy !== '' && (newBuyNum < cbLimits.buyFloor || newBuyNum > cbLimits.buyCeiling);
+  const sellOutBounds = newSell !== '' && (newSellNum < cbLimits.sellFloor || newSellNum > cbLimits.sellCeiling);
 
   const handleUpdate = () => {
     if (!buyOutBounds && !sellOutBounds && newBuy && newSell) {
@@ -36,14 +77,19 @@ const DealerMyRates: React.FC = () => {
     }
   };
 
-  // All dealers for comparison (anonymized except D002)
   const activeDealers = dealers.filter(d => d.status === 'Active');
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">My Rates</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Manage your exchange rates within Central Bank limits</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">My Rates</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Manage your exchange rates within Central Bank limits</p>
+        </div>
+        <button onClick={fetchLimits} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600">
+          <RefreshCw size={13} className={limitsLoading ? 'animate-spin' : ''} />
+          Refresh CB limits
+        </button>
       </div>
 
       {/* Current Rates — Large Display */}
@@ -60,27 +106,28 @@ const DealerMyRates: React.FC = () => {
         </div>
       </div>
 
-      {/* Market Info */}
-      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-wrap gap-6 text-sm">
+      {/* CB Limits Info — Live from API */}
+      <div className={`border rounded-xl p-4 flex flex-wrap gap-6 text-sm transition-all ${limitsLoading ? 'bg-gray-50 border-gray-200' : 'bg-blue-50 border-blue-200'}`}>
         <div className="flex items-center gap-2">
           <TrendingUp size={16} className="text-bos-green" />
           <span className="text-gray-500">Market Reference:</span>
-          <span className="font-bold text-gray-800">SL {marketRef.toLocaleString()}</span>
+          <span className="font-bold text-gray-800">SL {cbLimits.marketRef.toLocaleString()}</span>
+          {limitsLoading && <span className="text-xs text-gray-400">(loading...)</span>}
         </div>
         <div className="w-px h-5 bg-gray-300 hidden sm:block" />
         <div>
           <span className="text-gray-500">Allowed Buy: </span>
-          <span className="font-medium text-gray-700">SL {limits.buyFloor.toLocaleString()} — SL {limits.buyCeiling.toLocaleString()}</span>
+          <span className="font-medium text-gray-700">SL {cbLimits.buyFloor.toLocaleString()} — SL {cbLimits.buyCeiling.toLocaleString()}</span>
         </div>
         <div className="w-px h-5 bg-gray-300 hidden sm:block" />
         <div>
           <span className="text-gray-500">Allowed Sell: </span>
-          <span className="font-medium text-gray-700">SL {limits.sellFloor.toLocaleString()} — SL {limits.sellCeiling.toLocaleString()}</span>
+          <span className="font-medium text-gray-700">SL {cbLimits.sellFloor.toLocaleString()} — SL {cbLimits.sellCeiling.toLocaleString()}</span>
         </div>
         <div className="w-px h-5 bg-gray-300 hidden sm:block" />
         <div>
           <span className="text-gray-500">Max Spread: </span>
-          <span className="font-medium text-gray-700">2%</span>
+          <span className="font-medium text-gray-700">{cbLimits.maxSpreadPct}%</span>
         </div>
       </div>
 
@@ -95,7 +142,7 @@ const DealerMyRates: React.FC = () => {
                 className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${buyOutBounds ? 'border-red-400 focus:ring-red-200' : 'border-gray-300 focus:ring-bos-blue/30'}`} />
               {buyOutBounds && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <AlertTriangle size={12} /> Outside allowed range ({limits.buyFloor.toLocaleString()} — {limits.buyCeiling.toLocaleString()})
+                  <AlertTriangle size={12} /> Outside CB allowed range ({cbLimits.buyFloor.toLocaleString()} — {cbLimits.buyCeiling.toLocaleString()})
                 </p>
               )}
             </div>
@@ -105,7 +152,7 @@ const DealerMyRates: React.FC = () => {
                 className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${sellOutBounds ? 'border-red-400 focus:ring-red-200' : 'border-gray-300 focus:ring-bos-blue/30'}`} />
               {sellOutBounds && (
                 <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-                  <AlertTriangle size={12} /> Outside allowed range ({limits.sellFloor.toLocaleString()} — {limits.sellCeiling.toLocaleString()})
+                  <AlertTriangle size={12} /> Outside CB allowed range ({cbLimits.sellFloor.toLocaleString()} — {cbLimits.sellCeiling.toLocaleString()})
                 </p>
               )}
             </div>
